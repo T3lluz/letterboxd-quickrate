@@ -1,13 +1,10 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.0.0
+// @version      1.0.1
 // @description  Quickly rate movies from your watched and popular films with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
-// @grant        GM_xmlhttpRequest
-// @grant        GM_addStyle
-// @connect      letterboxd.com
 // @homepage     https://github.com/T3lluz/letterboxd-quickrate
 // @updateURL    https://github.com/T3lluz/letterboxd-quickrate/raw/main/letterboxd-quickrate.user.js
 // @downloadURL  https://github.com/T3lluz/letterboxd-quickrate/raw/main/letterboxd-quickrate.user.js
@@ -278,52 +275,50 @@
         let needed = 2;
 
         // Watched films
-        GM_xmlhttpRequest({
-            method: "GET",
-            url: `https://letterboxd.com/${username}/films/`,
-            onload: function(response) {
+        fetch(`https://letterboxd.com/${username}/films/`)
+            .then(response => response.text())
+            .then(html => {
                 try {
-                    let doc = new DOMParser().parseFromString(response.responseText, "text/html");
+                    let doc = new DOMParser().parseFromString(html, "text/html");
                     let watched = Array.from(doc.querySelectorAll('.poster-list .film-poster')).map(el => ({
                         title: el.getAttribute('data-film-name') || el.querySelector('img')?.alt || 'Unknown Title',
                         slug: el.getAttribute('data-film-slug'),
                         poster: el.querySelector('img')?.src || 'https://via.placeholder.com/250x375/333/666?text=No+Poster'
                     })).filter(m => m.slug); // Only include movies with valid slugs
                     movies = movies.concat(watched);
+                    console.log('Letterboxd Quick Rate: Fetched', watched.length, 'watched films');
                 } catch (e) {
                     console.error('Error parsing watched films:', e);
                 }
                 if (++loaded === needed) callback(movies);
-            },
-            onerror: function() {
-                console.error('Failed to fetch watched films');
+            })
+            .catch(error => {
+                console.error('Failed to fetch watched films:', error);
                 if (++loaded === needed) callback(movies);
-            }
-        });
+            });
 
         // Most popular all time
-        GM_xmlhttpRequest({
-            method: "GET",
-            url: `https://letterboxd.com/films/popular/this/all-time/`,
-            onload: function(response) {
+        fetch(`https://letterboxd.com/films/popular/this/all-time/`)
+            .then(response => response.text())
+            .then(html => {
                 try {
-                    let doc = new DOMParser().parseFromString(response.responseText, "text/html");
+                    let doc = new DOMParser().parseFromString(html, "text/html");
                     let popular = Array.from(doc.querySelectorAll('.poster-list .film-poster')).map(el => ({
                         title: el.getAttribute('data-film-name') || el.querySelector('img')?.alt || 'Unknown Title',
                         slug: el.getAttribute('data-film-slug'),
                         poster: el.querySelector('img')?.src || 'https://via.placeholder.com/250x375/333/666?text=No+Poster'
                     })).filter(m => m.slug); // Only include movies with valid slugs
                     movies = movies.concat(popular);
+                    console.log('Letterboxd Quick Rate: Fetched', popular.length, 'popular films');
                 } catch (e) {
                     console.error('Error parsing popular films:', e);
                 }
                 if (++loaded === needed) callback(movies);
-            },
-            onerror: function() {
-                console.error('Failed to fetch popular films');
+            })
+            .catch(error => {
+                console.error('Failed to fetch popular films:', error);
                 if (++loaded === needed) callback(movies);
-            }
-        });
+            });
     }
 
     // --- RATING FUNCTION ---
