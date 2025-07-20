@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.0.2
+// @version      1.0.3
 // @description  Quickly rate movies from your watched and popular films with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -278,13 +278,57 @@
         fetch(`https://letterboxd.com/${username}/films/`)
             .then(response => response.text())
             .then(html => {
+                console.log('Letterboxd Quick Rate: Raw HTML length for watched films:', html.length);
+                console.log('Letterboxd Quick Rate: HTML preview:', html.substring(0, 500));
                 try {
                     let doc = new DOMParser().parseFromString(html, "text/html");
-                    let watched = Array.from(doc.querySelectorAll('.poster-list .film-poster')).map(el => ({
-                        title: el.getAttribute('data-film-name') || el.querySelector('img')?.alt || 'Unknown Title',
-                        slug: el.getAttribute('data-film-slug'),
-                        poster: el.querySelector('img')?.src || 'https://via.placeholder.com/250x375/333/666?text=No+Poster'
-                    })).filter(m => m.slug); // Only include movies with valid slugs
+                    
+                    // Try multiple selectors for different Letterboxd layouts
+                    let selectors = [
+                        '.poster-list .film-poster',
+                        '.poster-list li',
+                        '.poster-list .poster',
+                        '.poster-list [data-film-slug]',
+                        '.poster-list a[href*="/film/"]',
+                        '.poster-list .poster-container',
+                        '.poster-list .poster-view',
+                        '.poster-list .poster-view .poster',
+                        '.poster-list .poster-view .film-poster',
+                        '.poster-list .poster-view li',
+                        '.poster-list .poster-view a[href*="/film/"]'
+                    ];
+                    
+                    let watched = [];
+                    for (let selector of selectors) {
+                        let elements = doc.querySelectorAll(selector);
+                        if (elements.length > 0) {
+                            console.log('Letterboxd Quick Rate: Found', elements.length, 'elements with selector:', selector);
+                            watched = Array.from(elements).map(el => {
+                                // Try to get film slug from various attributes
+                                let slug = el.getAttribute('data-film-slug') || 
+                                          el.getAttribute('data-slug') ||
+                                          el.querySelector('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '') ||
+                                          el.closest('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '');
+                                
+                                // Try to get title from various sources
+                                let title = el.getAttribute('data-film-name') || 
+                                           el.getAttribute('data-title') ||
+                                           el.querySelector('img')?.alt ||
+                                           el.querySelector('.poster-title')?.textContent?.trim() ||
+                                           el.querySelector('h3')?.textContent?.trim() ||
+                                           'Unknown Title';
+                                
+                                // Try to get poster from various sources
+                                let poster = el.querySelector('img')?.src ||
+                                            el.querySelector('img')?.getAttribute('data-src') ||
+                                            'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                                
+                                return { title, slug, poster };
+                            }).filter(m => m.slug && m.slug.length > 0);
+                            break;
+                        }
+                    }
+                    
                     movies = movies.concat(watched);
                     console.log('Letterboxd Quick Rate: Fetched', watched.length, 'watched films');
                 } catch (e) {
@@ -301,13 +345,57 @@
         fetch(`https://letterboxd.com/films/popular/this/all-time/`)
             .then(response => response.text())
             .then(html => {
+                console.log('Letterboxd Quick Rate: Raw HTML length for popular films:', html.length);
+                console.log('Letterboxd Quick Rate: HTML preview:', html.substring(0, 500));
                 try {
                     let doc = new DOMParser().parseFromString(html, "text/html");
-                    let popular = Array.from(doc.querySelectorAll('.poster-list .film-poster')).map(el => ({
-                        title: el.getAttribute('data-film-name') || el.querySelector('img')?.alt || 'Unknown Title',
-                        slug: el.getAttribute('data-film-slug'),
-                        poster: el.querySelector('img')?.src || 'https://via.placeholder.com/250x375/333/666?text=No+Poster'
-                    })).filter(m => m.slug); // Only include movies with valid slugs
+                    
+                    // Try multiple selectors for different Letterboxd layouts
+                    let selectors = [
+                        '.poster-list .film-poster',
+                        '.poster-list li',
+                        '.poster-list .poster',
+                        '.poster-list [data-film-slug]',
+                        '.poster-list a[href*="/film/"]',
+                        '.poster-list .poster-container',
+                        '.poster-list .poster-view',
+                        '.poster-list .poster-view .poster',
+                        '.poster-list .poster-view .film-poster',
+                        '.poster-list .poster-view li',
+                        '.poster-list .poster-view a[href*="/film/"]'
+                    ];
+                    
+                    let popular = [];
+                    for (let selector of selectors) {
+                        let elements = doc.querySelectorAll(selector);
+                        if (elements.length > 0) {
+                            console.log('Letterboxd Quick Rate: Found', elements.length, 'elements with selector:', selector);
+                            popular = Array.from(elements).map(el => {
+                                // Try to get film slug from various attributes
+                                let slug = el.getAttribute('data-film-slug') || 
+                                          el.getAttribute('data-slug') ||
+                                          el.querySelector('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '') ||
+                                          el.closest('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '');
+                                
+                                // Try to get title from various sources
+                                let title = el.getAttribute('data-film-name') || 
+                                           el.getAttribute('data-title') ||
+                                           el.querySelector('img')?.alt ||
+                                           el.querySelector('.poster-title')?.textContent?.trim() ||
+                                           el.querySelector('h3')?.textContent?.trim() ||
+                                           'Unknown Title';
+                                
+                                // Try to get poster from various sources
+                                let poster = el.querySelector('img')?.src ||
+                                            el.querySelector('img')?.getAttribute('data-src') ||
+                                            'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                                
+                                return { title, slug, poster };
+                            }).filter(m => m.slug && m.slug.length > 0);
+                            break;
+                        }
+                    }
+                    
                     movies = movies.concat(popular);
                     console.log('Letterboxd Quick Rate: Fetched', popular.length, 'popular films');
                 } catch (e) {
