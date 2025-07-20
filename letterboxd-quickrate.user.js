@@ -17,178 +17,182 @@
     'use strict';
 
     // --- STYLES ---
-    GM_addStyle(`
-        #lb-quickrate-modal {
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100vw; 
-            height: 100vh;
-            background: rgba(0,0,0,0.9); 
-            z-index: 99999; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        
-        #lb-quickrate-card {
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            color: #fff; 
-            border-radius: 16px; 
-            padding: 40px; 
-            width: 400px; 
-            text-align: center;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-            border: 1px solid #333;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        #lb-quickrate-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #ff8000, #ff6b35, #ff8000);
-        }
-        
-        #lb-quickrate-card h2 {
-            margin: 0 0 20px 0;
-            font-size: 24px;
-            font-weight: 600;
-            color: #fff;
-        }
-        
-        #lb-quickrate-card img { 
-            width: 250px; 
-            height: 375px;
-            border-radius: 12px; 
-            object-fit: cover;
-            margin: 0 auto 24px auto;
-            display: block;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-        }
-        
-        #lb-quickrate-stars { 
-            margin: 24px 0;
-        }
-        
-        #lb-quickrate-stars button {
-            font-size: 2.5em; 
-            margin: 0 8px; 
-            background: none; 
-            border: none; 
-            color: #333; 
-            cursor: pointer;
-            transition: all 0.2s ease;
-            filter: grayscale(1);
-        }
-        
-        #lb-quickrate-stars button:hover {
-            color: #ffcc00;
-            filter: grayscale(0);
-            transform: scale(1.1);
-        }
-        
-        #lb-quickrate-stars button.active {
-            color: #ffcc00;
-            filter: grayscale(0);
-        }
-        
-        #lb-quickrate-skip { 
-            margin-top: 20px; 
-            color: #888; 
-            cursor: pointer;
-            padding: 12px 24px;
-            border: 1px solid #444;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-            display: inline-block;
-        }
-        
-        #lb-quickrate-skip:hover {
-            color: #fff;
-            border-color: #666;
-            background: rgba(255,255,255,0.1);
-        }
-        
-        #lb-quickrate-close { 
-            position: absolute; 
-            top: 20px; 
-            right: 20px; 
-            color: #fff; 
-            font-size: 2em; 
-            cursor: pointer;
-            background: none;
-            border: none;
-            padding: 0;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-        }
-        
-        #lb-quickrate-close:hover {
-            background: rgba(255,255,255,0.1);
-        }
-        
-        #lb-quickrate-progress {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #ff8000, #ff6b35);
-            transition: width 0.3s ease;
-        }
-        
-        .lb-quickrate-btn {
-            background: linear-gradient(135deg, #ff8000 0%, #ff6b35 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            display: inline-block;
-            margin: 0 8px;
-            box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3);
-        }
-        
-        .lb-quickrate-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(255, 128, 0, 0.5);
-        }
-        
-        .lb-quickrate-btn:active {
-            transform: translateY(0);
-        }
-        
-        .lb-quickrate-floating {
-            position: fixed;
-            bottom: 32px;
-            right: 32px;
-            z-index: 99998;
-            animation: lb-quickrate-pulse 2s infinite;
-            border-radius: 12px;
-            padding: 8px;
-            background: rgba(0,0,0,0.8);
-            backdrop-filter: blur(10px);
-        }
-        
-        @keyframes lb-quickrate-pulse {
-            0% { transform: scale(1); box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3); }
-            50% { transform: scale(1.05); box-shadow: 0 8px 24px rgba(255, 128, 0, 0.6); }
-            100% { transform: scale(1); box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3); }
-        }
-    `);
+    function addStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
+            #lb-quickrate-modal {
+                position: fixed; 
+                top: 0; 
+                left: 0; 
+                width: 100vw; 
+                height: 100vh;
+                background: rgba(0,0,0,0.9); 
+                z-index: 99999; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            
+            #lb-quickrate-card {
+                background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+                color: #fff; 
+                border-radius: 16px; 
+                padding: 40px; 
+                width: 400px; 
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+                border: 1px solid #333;
+                position: relative;
+                overflow: hidden;
+            }
+            
+            #lb-quickrate-card::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #ff8000, #ff6b35, #ff8000);
+            }
+            
+            #lb-quickrate-card h2 {
+                margin: 0 0 20px 0;
+                font-size: 24px;
+                font-weight: 600;
+                color: #fff;
+            }
+            
+            #lb-quickrate-card img { 
+                width: 250px; 
+                height: 375px;
+                border-radius: 12px; 
+                object-fit: cover;
+                margin: 0 auto 24px auto;
+                display: block;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            }
+            
+            #lb-quickrate-stars { 
+                margin: 24px 0;
+            }
+            
+            #lb-quickrate-stars button {
+                font-size: 2.5em; 
+                margin: 0 8px; 
+                background: none; 
+                border: none; 
+                color: #333; 
+                cursor: pointer;
+                transition: all 0.2s ease;
+                filter: grayscale(1);
+            }
+            
+            #lb-quickrate-stars button:hover {
+                color: #ffcc00;
+                filter: grayscale(0);
+                transform: scale(1.1);
+            }
+            
+            #lb-quickrate-stars button.active {
+                color: #ffcc00;
+                filter: grayscale(0);
+            }
+            
+            #lb-quickrate-skip { 
+                margin-top: 20px; 
+                color: #888; 
+                cursor: pointer;
+                padding: 12px 24px;
+                border: 1px solid #444;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+                display: inline-block;
+            }
+            
+            #lb-quickrate-skip:hover {
+                color: #fff;
+                border-color: #666;
+                background: rgba(255,255,255,0.1);
+            }
+            
+            #lb-quickrate-close { 
+                position: absolute; 
+                top: 20px; 
+                right: 20px; 
+                color: #fff; 
+                font-size: 2em; 
+                cursor: pointer;
+                background: none;
+                border: none;
+                padding: 0;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            }
+            
+            #lb-quickrate-close:hover {
+                background: rgba(255,255,255,0.1);
+            }
+            
+            #lb-quickrate-progress {
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #ff8000, #ff6b35);
+                transition: width 0.3s ease;
+            }
+            
+            .lb-quickrate-btn {
+                background: linear-gradient(135deg, #ff8000 0%, #ff6b35 100%);
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 8px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                text-decoration: none;
+                display: inline-block;
+                margin: 0 8px;
+                box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3);
+            }
+            
+            .lb-quickrate-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(255, 128, 0, 0.5);
+            }
+            
+            .lb-quickrate-btn:active {
+                transform: translateY(0);
+            }
+            
+            .lb-quickrate-floating {
+                position: fixed;
+                bottom: 32px;
+                right: 32px;
+                z-index: 99998;
+                animation: lb-quickrate-pulse 2s infinite;
+                border-radius: 12px;
+                padding: 8px;
+                background: rgba(0,0,0,0.8);
+                backdrop-filter: blur(10px);
+            }
+            
+            @keyframes lb-quickrate-pulse {
+                0% { transform: scale(1); box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3); }
+                50% { transform: scale(1.05); box-shadow: 0 8px 24px rgba(255, 128, 0, 0.6); }
+                100% { transform: scale(1); box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
 
     // --- UTILS ---
     function getUsername() {
@@ -471,7 +475,39 @@
                 console.log('Letterboxd Quick Rate: Button added to nav container');
             }
             
-            // 5. If no suitable location found, create a floating button
+            // 5. Try to add to Letterboxd's specific navigation structure
+            let letterboxdNav = document.querySelector('.nav-primary') || document.querySelector('.primary-nav') || document.querySelector('.site-nav');
+            if (letterboxdNav && !buttonAdded) {
+                let btn = document.createElement('a');
+                btn.textContent = 'Quick Rate';
+                btn.className = 'lb-quickrate-btn';
+                btn.style = 'margin-left: 16px; display: inline-block;';
+                btn.onclick = e => { 
+                    e.preventDefault(); 
+                    startQuickRate(); 
+                };
+                letterboxdNav.appendChild(btn);
+                buttonAdded = true;
+                console.log('Letterboxd Quick Rate: Button added to Letterboxd nav');
+            }
+            
+            // 6. Try to add to the user menu area (next to username)
+            let userMenu = document.querySelector('.user-menu') || document.querySelector('.profile-menu') || document.querySelector('[data-testid="user-menu"]');
+            if (userMenu && !buttonAdded) {
+                let btn = document.createElement('a');
+                btn.textContent = 'Quick Rate';
+                btn.className = 'lb-quickrate-btn';
+                btn.style = 'margin-left: 16px; display: inline-block;';
+                btn.onclick = e => { 
+                    e.preventDefault(); 
+                    startQuickRate(); 
+                };
+                userMenu.appendChild(btn);
+                buttonAdded = true;
+                console.log('Letterboxd Quick Rate: Button added to user menu');
+            }
+            
+            // 7. If no suitable location found, create a floating button
             if (!buttonAdded) {
                 let btn = document.createElement('div');
                 btn.className = 'lb-quickrate-floating';
@@ -484,24 +520,57 @@
     }
 
     // --- INIT ---
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', addQuickRateButton);
-    } else {
-        addQuickRateButton();
-    }
-    
-    // Also add a floating button immediately as a backup
-    setTimeout(() => {
-        // Check if any button was already added
-        let existingButton = document.querySelector('.lb-quickrate-btn');
-        if (!existingButton) {
+    function init() {
+        try {
+            // Add styles first
+            addStyles();
+            console.log('Letterboxd Quick Rate: Styles added successfully');
+            
+            // Add button
+            addQuickRateButton();
+            
+            // Also add a floating button immediately as a backup
+            setTimeout(() => {
+                // Check if any button was already added
+                let existingButton = document.querySelector('.lb-quickrate-btn');
+                if (!existingButton) {
+                    let btn = document.createElement('div');
+                    btn.className = 'lb-quickrate-floating';
+                    btn.innerHTML = '<a class="lb-quickrate-btn">Quick Rate</a>';
+                    btn.onclick = startQuickRate;
+                    document.body.appendChild(btn);
+                    console.log('Letterboxd Quick Rate: Backup floating button added');
+                }
+            }, 1000);
+            
+        } catch (error) {
+            console.error('Letterboxd Quick Rate: Error during initialization:', error);
+            // Fallback: create a simple floating button
             let btn = document.createElement('div');
-            btn.className = 'lb-quickrate-floating';
-            btn.innerHTML = '<a class="lb-quickrate-btn">Quick Rate</a>';
+            btn.style.cssText = `
+                position: fixed;
+                bottom: 32px;
+                right: 32px;
+                z-index: 99998;
+                background: #ff8000;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3);
+            `;
+            btn.textContent = 'Quick Rate';
             btn.onclick = startQuickRate;
             document.body.appendChild(btn);
-            console.log('Letterboxd Quick Rate: Backup floating button added');
+            console.log('Letterboxd Quick Rate: Fallback button added');
         }
-    }, 1000);
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 
 })(); 
