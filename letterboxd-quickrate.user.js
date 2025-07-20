@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.5.0
+// @version      1.6.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -471,7 +471,9 @@
                 
                 // Get title from multiple sources
                 let title = element.getAttribute('data-film-name') || 
+                           element.getAttribute('data-original-title') ||
                            element.getAttribute('title') ||
+                           element.querySelector('.frame-title')?.textContent?.trim() ||
                            element.querySelector('img')?.alt ||
                            element.querySelector('.poster-title')?.textContent?.trim() ||
                            element.querySelector('h3')?.textContent?.trim() ||
@@ -484,9 +486,18 @@
                 let posterImg = element.querySelector('img')?.src ||
                                element.querySelector('img')?.getAttribute('data-src') ||
                                element.querySelector('img')?.getAttribute('data-srcset')?.split(' ')[0] ||
+                               element.querySelector('.poster img')?.src ||
+                               element.querySelector('.poster img')?.getAttribute('data-src') ||
+                               element.querySelector('.poster img')?.getAttribute('data-srcset')?.split(' ')[0] ||
                                'https://via.placeholder.com/250x375/333/666?text=No+Poster';
                 
                 console.log(`Letterboxd Quick Rate: Extracted from ${source} - Title: "${title}", Slug: "${slug}", Image: "${posterImg}"`);
+                
+                // If title is still unknown, try to extract from slug
+                if (title === 'Unknown Title' && slug && slug.length > 0) {
+                    title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                    console.log(`Letterboxd Quick Rate: Generated title from slug: "${title}"`);
+                }
                 
                 if (slug && slug.length > 0 && title !== 'Unknown Title' && title.length > 0) {
                     movies.push({ title, slug, poster: posterImg });
