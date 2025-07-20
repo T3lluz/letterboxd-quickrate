@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.3.0
+// @version      1.4.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -114,6 +114,16 @@
                 background: rgba(255,255,255,0.1);
                 color: #fff;
                 transform: scale(1.1);
+            }
+            
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
             }
             
             #lb-quickrate-buttons button {
@@ -349,22 +359,76 @@
                     let doc = new DOMParser().parseFromString(html, "text/html");
                     let extracted = [];
                     
-                    // Multiple selectors for maximum compatibility
-                    let posters = doc.querySelectorAll('.poster-list .film-poster, .poster-list li, .poster-list .poster, .poster-list a[href*="/film/"]');
-                    console.log(`Letterboxd Quick Rate: Found ${posters.length} posters in ${source}`);
+                    // Debug: Log the entire HTML to see the structure
+                    console.log(`Letterboxd Quick Rate: HTML structure for ${source}:`, doc.body.innerHTML.substring(0, 1000));
                     
-                    posters.forEach(poster => {
+                    // Try multiple selectors for maximum compatibility
+                    let selectors = [
+                        '.poster-list .film-poster',
+                        '.poster-list li',
+                        '.poster-list .poster',
+                        '.poster-list a[href*="/film/"]',
+                        '.poster-list .poster-container',
+                        '.poster-list .poster-view',
+                        '.poster-list .poster-view a',
+                        '.poster-list .poster-view .poster',
+                        '.poster-list .poster-view .poster a',
+                        '.poster-list .poster-view .poster img',
+                        '.poster-list .poster-view .poster-container',
+                        '.poster-list .poster-view .poster-container a',
+                        '.poster-list .poster-view .poster-container img',
+                        '.poster-list .poster-view .poster-container .poster',
+                        '.poster-list .poster-view .poster-container .poster a',
+                        '.poster-list .poster-view .poster-container .poster img',
+                        '.poster-list .poster-view .poster-container .poster .poster-title',
+                        '.poster-list .poster-view .poster-container .poster .poster-title a',
+                        '.poster-list .poster-view .poster-container .poster .poster-title img',
+                        '.poster-list .poster-view .poster-container .poster .poster-title .poster-title',
+                        '.poster-list .poster-view .poster-container .poster .poster-title .poster-title a',
+                        '.poster-list .poster-view .poster-container .poster .poster-title .poster-title img',
+                        '.poster-list .poster-view .poster-container .poster .poster-title .poster-title .poster-title',
+                        '.poster-list .poster-view .poster-container .poster .poster-title .poster-title .poster-title a',
+                        '.poster-list .poster-view .poster-container .poster .poster-title .poster-title .poster-title img'
+                    ];
+                    
+                    let posters = [];
+                    for (let selector of selectors) {
+                        let found = doc.querySelectorAll(selector);
+                        console.log(`Letterboxd Quick Rate: Selector "${selector}" found ${found.length} elements`);
+                        if (found.length > 0) {
+                            posters = found;
+                            break;
+                        }
+                    }
+                    
+                    console.log(`Letterboxd Quick Rate: Using ${posters.length} posters from ${source}`);
+                    
+                    posters.forEach((poster, index) => {
                         try {
+                            console.log(`Letterboxd Quick Rate: Processing poster ${index + 1}:`, poster.outerHTML.substring(0, 200));
+                            
                             // Get film slug from multiple sources
                             let slug = poster.getAttribute('data-film-slug');
                             if (!slug) {
-                                let link = poster.querySelector('a[href*="/film/"]') || poster;
-                                if (link && link.href) {
+                                // Try to find any link with /film/ in it
+                                let links = poster.querySelectorAll('a[href*="/film/"]');
+                                for (let link of links) {
                                     let href = link.href;
                                     let match = href.match(/\/film\/([^\/\?]+)/);
                                     if (match) {
                                         slug = match[1];
+                                        console.log(`Letterboxd Quick Rate: Found slug from link: ${slug}`);
+                                        break;
                                     }
+                                }
+                            }
+                            
+                            // If still no slug, try the poster itself
+                            if (!slug && poster.href) {
+                                let match = poster.href.match(/\/film\/([^\/\?]+)/);
+                                if (match) {
+                                    slug = match[1];
+                                    console.log(`Letterboxd Quick Rate: Found slug from poster href: ${slug}`);
                                 }
                             }
                             
@@ -374,6 +438,8 @@
                                        poster.querySelector('.poster-title')?.textContent?.trim() ||
                                        poster.querySelector('h3')?.textContent?.trim() ||
                                        poster.querySelector('a')?.title ||
+                                       poster.querySelector('.poster-title a')?.textContent?.trim() ||
+                                       poster.querySelector('.poster-title .poster-title')?.textContent?.trim() ||
                                        'Unknown Title';
                             
                             // Get poster image
@@ -382,9 +448,13 @@
                                            poster.querySelector('img')?.getAttribute('data-srcset')?.split(' ')[0] ||
                                            'https://via.placeholder.com/250x375/333/666?text=No+Poster';
                             
+                            console.log(`Letterboxd Quick Rate: Extracted - Title: "${title}", Slug: "${slug}", Image: "${posterImg}"`);
+                            
                             if (slug && slug.length > 0 && title !== 'Unknown Title' && title.length > 0) {
                                 extracted.push({ title, slug, poster: posterImg });
-                                console.log(`Letterboxd Quick Rate: Found movie in ${source}:`, title, '(', slug, ')');
+                                console.log(`Letterboxd Quick Rate: Successfully added movie: ${title} (${slug})`);
+                            } else {
+                                console.log(`Letterboxd Quick Rate: Skipping movie - invalid data: title="${title}", slug="${slug}"`);
                             }
                         } catch (error) {
                             console.error('Letterboxd Quick Rate: Error parsing poster:', error);
@@ -444,11 +514,106 @@
         
         tryNextSource();
     }
+    
+    // Fallback: Extract movies from current page
+    function extractMoviesFromCurrentPage() {
+        console.log('Letterboxd Quick Rate: Extracting movies from current page as fallback...');
+        let movies = [];
+        
+        // Look for any movie links on the current page
+        let movieLinks = document.querySelectorAll('a[href*="/film/"]');
+        console.log('Letterboxd Quick Rate: Found', movieLinks.length, 'movie links on current page');
+        
+        movieLinks.forEach((link, index) => {
+            try {
+                let href = link.href;
+                let match = href.match(/\/film\/([^\/\?]+)/);
+                if (match) {
+                    let slug = match[1];
+                    let title = link.title || 
+                               link.querySelector('img')?.alt ||
+                               link.textContent?.trim() ||
+                               'Unknown Title';
+                    let poster = link.querySelector('img')?.src ||
+                                link.querySelector('img')?.getAttribute('data-src') ||
+                                'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                    
+                    if (slug && title !== 'Unknown Title' && !movies.find(m => m.slug === slug)) {
+                        movies.push({ title, slug, poster });
+                        console.log(`Letterboxd Quick Rate: Found movie on current page: ${title} (${slug})`);
+                    }
+                }
+            } catch (error) {
+                console.error('Letterboxd Quick Rate: Error parsing movie link:', error);
+            }
+        });
+        
+        return movies;
+    }
 
     // --- RATING FUNCTION ---
     function rateMovie(slug, stars) {
-        // Open the movie's rate page in a new tab
-        window.open(`https://letterboxd.com${slug}rate/${stars}/`, '_blank');
+        console.log(`Letterboxd Quick Rate: Rating movie ${slug} with ${stars} stars`);
+        
+        // Create the rating URL
+        let ratingURL = `https://letterboxd.com/film/${slug}/rate/${stars}/`;
+        
+        // Use fetch to submit the rating
+        fetch(ratingURL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            credentials: 'include' // Include cookies for authentication
+        })
+        .then(response => {
+            console.log(`Letterboxd Quick Rate: Rating response status: ${response.status}`);
+            if (response.ok) {
+                console.log(`Letterboxd Quick Rate: Successfully rated ${slug} with ${stars} stars`);
+                // Show success feedback
+                showRatingFeedback(true, stars);
+            } else {
+                console.error(`Letterboxd Quick Rate: Failed to rate movie: ${response.status}`);
+                showRatingFeedback(false, stars);
+            }
+        })
+        .catch(error => {
+            console.error('Letterboxd Quick Rate: Error rating movie:', error);
+            // Fallback: open in new tab
+            window.open(ratingURL, '_blank');
+            showRatingFeedback(false, stars);
+        });
+    }
+    
+    function showRatingFeedback(success, stars) {
+        let feedback = document.createElement('div');
+        feedback.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${success ? '#4CAF50' : '#f44336'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 100000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease;
+        `;
+        
+        feedback.textContent = success ? 
+            `✓ Rated with ${stars} star${stars !== 1 ? 's' : ''}` : 
+            `⚠ Rating failed - opened in new tab`;
+        
+        document.body.appendChild(feedback);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            feedback.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => feedback.remove(), 300);
+        }, 3000);
     }
 
     // --- MAIN LOGIC ---
@@ -470,8 +635,13 @@
             loadingModal.remove();
             
             if (allMovies.length === 0) {
-                alert('No movies found. Please try again later.');
-                return;
+                console.log('Letterboxd Quick Rate: No movies from popular sources, trying current page...');
+                allMovies = extractMoviesFromCurrentPage();
+                
+                if (allMovies.length === 0) {
+                    alert('No movies found. Please navigate to a page with movies (like your films page or any movie list) and try again.');
+                    return;
+                }
             }
 
             // Dedupe by slug
