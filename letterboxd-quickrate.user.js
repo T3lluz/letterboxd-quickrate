@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.0.1
+// @version      1.0.2
 // @description  Quickly rate movies from your watched and popular films with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -400,118 +400,24 @@
 
     // --- NAV BUTTON ---
     function addQuickRateButton() {
-        // Wait for the page to load
+        // Only create the floating button - remove all navigation button logic
         setTimeout(() => {
-            // Try multiple possible locations for the button
-            let buttonAdded = false;
+            // Remove any existing buttons first
+            let existingButtons = document.querySelectorAll('.lb-quickrate-btn');
+            existingButtons.forEach(btn => {
+                if (btn.parentNode) {
+                    btn.parentNode.removeChild(btn);
+                }
+            });
             
-            // 1. Try to add to the main navigation (where FILMS, LISTS, MEMBERS, JOURNAL are)
-            let mainNav = document.querySelector('nav') || document.querySelector('.nav') || document.querySelector('.navigation');
-            if (mainNav && !buttonAdded) {
-                let btn = document.createElement('a');
-                btn.textContent = 'Quick Rate';
-                btn.className = 'lb-quickrate-btn';
-                btn.style = 'margin-left: 16px; display: inline-block;';
-                btn.onclick = e => { 
-                    e.preventDefault(); 
-                    startQuickRate(); 
-                };
-                mainNav.appendChild(btn);
-                buttonAdded = true;
-                console.log('Letterboxd Quick Rate: Button added to main navigation');
-            }
-            
-            // 2. Try to add next to the "+ LOG" button area
-            let logButton = document.querySelector('a[href="/films/add/"]') || document.querySelector('a[href*="add"]') || document.querySelector('.add-film-button');
-            if (logButton && !buttonAdded) {
-                let btn = document.createElement('a');
-                btn.textContent = 'Quick Rate';
-                btn.className = 'lb-quickrate-btn';
-                btn.style = 'margin-left: 16px; display: inline-block;';
-                btn.onclick = e => { 
-                    e.preventDefault(); 
-                    startQuickRate(); 
-                };
-                logButton.parentNode.insertBefore(btn, logButton.nextSibling);
-                buttonAdded = true;
-                console.log('Letterboxd Quick Rate: Button added next to LOG button');
-            }
-            
-            // 3. Try to add to the header area
-            let header = document.querySelector('header') || document.querySelector('.header') || document.querySelector('.site-header');
-            if (header && !buttonAdded) {
-                let btn = document.createElement('a');
-                btn.textContent = 'Quick Rate';
-                btn.className = 'lb-quickrate-btn';
-                btn.style = 'margin-left: 16px; display: inline-block; position: absolute; right: 120px; top: 50%; transform: translateY(-50%);';
-                btn.onclick = e => { 
-                    e.preventDefault(); 
-                    startQuickRate(); 
-                };
-                header.style.position = 'relative';
-                header.appendChild(btn);
-                buttonAdded = true;
-                console.log('Letterboxd Quick Rate: Button added to header');
-            }
-            
-            // 4. Try to add to the top-level navigation container
-            let navContainer = document.querySelector('.nav-container') || document.querySelector('.nav-wrapper') || document.querySelector('.site-nav');
-            if (navContainer && !buttonAdded) {
-                let btn = document.createElement('a');
-                btn.textContent = 'Quick Rate';
-                btn.className = 'lb-quickrate-btn';
-                btn.style = 'margin-left: 16px; display: inline-block;';
-                btn.onclick = e => { 
-                    e.preventDefault(); 
-                    startQuickRate(); 
-                };
-                navContainer.appendChild(btn);
-                buttonAdded = true;
-                console.log('Letterboxd Quick Rate: Button added to nav container');
-            }
-            
-            // 5. Try to add to Letterboxd's specific navigation structure
-            let letterboxdNav = document.querySelector('.nav-primary') || document.querySelector('.primary-nav') || document.querySelector('.site-nav');
-            if (letterboxdNav && !buttonAdded) {
-                let btn = document.createElement('a');
-                btn.textContent = 'Quick Rate';
-                btn.className = 'lb-quickrate-btn';
-                btn.style = 'margin-left: 16px; display: inline-block;';
-                btn.onclick = e => { 
-                    e.preventDefault(); 
-                    startQuickRate(); 
-                };
-                letterboxdNav.appendChild(btn);
-                buttonAdded = true;
-                console.log('Letterboxd Quick Rate: Button added to Letterboxd nav');
-            }
-            
-            // 6. Try to add to the user menu area (next to username)
-            let userMenu = document.querySelector('.user-menu') || document.querySelector('.profile-menu') || document.querySelector('[data-testid="user-menu"]');
-            if (userMenu && !buttonAdded) {
-                let btn = document.createElement('a');
-                btn.textContent = 'Quick Rate';
-                btn.className = 'lb-quickrate-btn';
-                btn.style = 'margin-left: 16px; display: inline-block;';
-                btn.onclick = e => { 
-                    e.preventDefault(); 
-                    startQuickRate(); 
-                };
-                userMenu.appendChild(btn);
-                buttonAdded = true;
-                console.log('Letterboxd Quick Rate: Button added to user menu');
-            }
-            
-            // 7. If no suitable location found, create a floating button
-            if (!buttonAdded) {
-                let btn = document.createElement('div');
-                btn.className = 'lb-quickrate-floating';
-                btn.innerHTML = '<a class="lb-quickrate-btn">Quick Rate</a>';
-                btn.onclick = startQuickRate;
-                document.body.appendChild(btn);
-                console.log('Letterboxd Quick Rate: Floating button added (no navigation found)');
-            }
-        }, 3000); // Increased delay to ensure page is fully loaded
+            // Create only the floating button
+            let btn = document.createElement('div');
+            btn.className = 'lb-quickrate-floating';
+            btn.innerHTML = '<a class="lb-quickrate-btn">Quick Rate</a>';
+            btn.onclick = startQuickRate;
+            document.body.appendChild(btn);
+            console.log('Letterboxd Quick Rate: Floating button added');
+        }, 1000);
     }
 
     // --- INIT ---
@@ -523,20 +429,6 @@
             
             // Add button
             addQuickRateButton();
-            
-            // Also add a floating button immediately as a backup
-            setTimeout(() => {
-                // Check if any button was already added
-                let existingButton = document.querySelector('.lb-quickrate-btn');
-                if (!existingButton) {
-                    let btn = document.createElement('div');
-                    btn.className = 'lb-quickrate-floating';
-                    btn.innerHTML = '<a class="lb-quickrate-btn">Quick Rate</a>';
-                    btn.onclick = startQuickRate;
-                    document.body.appendChild(btn);
-                    console.log('Letterboxd Quick Rate: Backup floating button added');
-                }
-            }, 1000);
             
         } catch (error) {
             console.error('Letterboxd Quick Rate: Error during initialization:', error);
