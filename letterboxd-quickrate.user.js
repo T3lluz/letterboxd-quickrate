@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.0.4
+// @version      1.0.5
 // @description  Quickly rate movies from your watched and popular films with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -193,27 +193,68 @@
 
     // --- UTILS ---
     function getUsername() {
-        // Try to get username from navigation
-        let userLink = document.querySelector('a[href^="/user/"]');
-        if (userLink) {
-            let match = userLink.href.match(/letterboxd\.com\/user\/([^/]+)/);
-            if (match) return match[1];
+        console.log('Letterboxd Quick Rate: Detecting username...');
+        
+        // First, try to get from current URL if we're on a user's page
+        let currentPath = window.location.pathname;
+        console.log('Letterboxd Quick Rate: Current path:', currentPath);
+        
+        // Check if we're on a user's films page: /username/films/
+        let filmsMatch = currentPath.match(/^\/([^\/]+)\/films/);
+        if (filmsMatch) {
+            console.log('Letterboxd Quick Rate: Found username from URL:', filmsMatch[1]);
+            return filmsMatch[1];
         }
         
-        // Try to get from profile link
+        // Check if we're on a user's profile page: /username/
+        let profileMatch = currentPath.match(/^\/([^\/]+)\/?$/);
+        if (profileMatch && profileMatch[1] !== 'films' && profileMatch[1] !== 'members' && profileMatch[1] !== 'lists') {
+            console.log('Letterboxd Quick Rate: Found username from profile URL:', profileMatch[1]);
+            return profileMatch[1];
+        }
+        
+        // Try to get username from navigation links
+        let userLinks = document.querySelectorAll('a[href*="/"]');
+        for (let link of userLinks) {
+            let href = link.href;
+            // Look for /username/ pattern in href
+            let match = href.match(/letterboxd\.com\/([^\/]+)\/?$/);
+            if (match && match[1] && 
+                match[1] !== 'films' && 
+                match[1] !== 'members' && 
+                match[1] !== 'lists' && 
+                match[1] !== 'request-password-reset' &&
+                match[1] !== 'sign-in' &&
+                match[1] !== 'sign-up' &&
+                match[1] !== 'about' &&
+                match[1] !== 'help' &&
+                match[1] !== 'contact') {
+                console.log('Letterboxd Quick Rate: Found username from link:', match[1]);
+                return match[1];
+            }
+        }
+        
+        // Try to get from profile link specifically
         let profileLink = document.querySelector('a[href*="/profile/"]');
         if (profileLink) {
             let match = profileLink.href.match(/letterboxd\.com\/profile\/([^/]+)/);
-            if (match) return match[1];
+            if (match) {
+                console.log('Letterboxd Quick Rate: Found username from profile link:', match[1]);
+                return match[1];
+            }
         }
         
         // Try to get from meta tag
         let meta = document.querySelector('meta[name="twitter:app:url:iphone"]');
         if (meta) {
             let match = meta.content.match(/letterboxd:\/\/profile\/([^/]+)/);
-            if (match) return match[1];
+            if (match) {
+                console.log('Letterboxd Quick Rate: Found username from meta tag:', match[1]);
+                return match[1];
+            }
         }
         
+        console.log('Letterboxd Quick Rate: Could not detect username');
         return null;
     }
 
@@ -342,6 +383,16 @@
 
         // Watched films - try fetch first, then fallback to current page
         console.log('Letterboxd Quick Rate: Fetching watched films from:', `https://letterboxd.com/${username}/films/`);
+        
+        // If we're already on the films page, try current page first
+        if (window.location.pathname.includes('/films')) {
+            console.log('Letterboxd Quick Rate: Already on films page, extracting from current DOM first...');
+            let watched = extractMoviesFromDOM(document, 'current page DOM');
+            movies = movies.concat(watched);
+            console.log('Letterboxd Quick Rate: Extracted', watched.length, 'watched films from current page');
+            loaded++;
+        }
+        
         fetch(`https://letterboxd.com/${username}/films/`)
             .then(response => {
                 console.log('Letterboxd Quick Rate: Watched films response status:', response.status);
@@ -362,15 +413,6 @@
             })
             .catch(error => {
                 console.error('Failed to fetch watched films:', error);
-                console.log('Letterboxd Quick Rate: Trying to extract from current page DOM...');
-                
-                // Fallback: try to extract from current page if we're on the films page
-                if (window.location.pathname.includes('/films')) {
-                    let watched = extractMoviesFromDOM(document, 'current page DOM');
-                    movies = movies.concat(watched);
-                    console.log('Letterboxd Quick Rate: Extracted', watched.length, 'watched films from current page');
-                }
-                
                 if (++loaded === needed) callback(movies);
             });
 
