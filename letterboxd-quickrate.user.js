@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.1.0
+// @version      1.2.0
 // @description  Quickly rate movies from your watched and popular films with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -216,35 +216,111 @@
         document.head.appendChild(style);
     }
 
-    // --- UTILS ---
+    // --- USERNAME MANAGEMENT ---
+    function getStoredUsername() {
+        return localStorage.getItem('lb-quickrate-username');
+    }
+    
+    function saveUsername(username) {
+        localStorage.setItem('lb-quickrate-username', username);
+    }
+    
+    function showUsernameInput(callback) {
+        let modal = document.createElement('div');
+        modal.id = 'lb-quickrate-modal';
+        modal.innerHTML = `
+            <div id="lb-quickrate-card">
+                <h2>Enter Letterboxd Username</h2>
+                <p style="margin-bottom: 20px; color: #ccc;">Enter the username whose films you want to rate:</p>
+                <input type="text" id="lb-username-input" placeholder="e.g., t3lluz" style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #444;
+                    border-radius: 8px;
+                    background: #333;
+                    color: #fff;
+                    font-size: 16px;
+                    margin-bottom: 20px;
+                    box-sizing: border-box;
+                ">
+                <div id="lb-quickrate-buttons">
+                    <button id="lb-start-rating" style="
+                        background: #ff6b35;
+                        color: white;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        flex: 1;
+                    ">Start Rating</button>
+                    <button id="lb-cancel-input" style="
+                        background: #444;
+                        color: #ccc;
+                        border: none;
+                        padding: 12px 24px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        flex: 1;
+                        margin-left: 10px;
+                    ">Cancel</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        let input = modal.querySelector('#lb-username-input');
+        let startBtn = modal.querySelector('#lb-start-rating');
+        let cancelBtn = modal.querySelector('#lb-cancel-input');
+        
+        // Focus input
+        input.focus();
+        
+        // Handle enter key
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                startBtn.click();
+            }
+        });
+        
+        // Start rating
+        startBtn.addEventListener('click', () => {
+            let username = input.value.trim();
+            if (username) {
+                saveUsername(username);
+                modal.remove();
+                callback(username);
+            } else {
+                input.style.borderColor = '#ff4444';
+                input.placeholder = 'Please enter a username';
+            }
+        });
+        
+        // Cancel
+        cancelBtn.addEventListener('click', () => {
+            modal.remove();
+        });
+    }
+    
     function getUsername() {
-        console.log('Letterboxd Quick Rate: Detecting username...');
+        // First try stored username
+        let stored = getStoredUsername();
+        if (stored) {
+            console.log('Letterboxd Quick Rate: Using stored username:', stored);
+            return stored;
+        }
         
-        // Get from current URL - this is the most reliable method
+        // Then try URL detection
         let currentPath = window.location.pathname;
-        console.log('Letterboxd Quick Rate: Current path:', currentPath);
-        
-        // Extract username from /username/films/ pattern
         let match = currentPath.match(/^\/([^\/]+)\/films/);
         if (match && match[1]) {
             console.log('Letterboxd Quick Rate: Found username from URL:', match[1]);
+            saveUsername(match[1]);
             return match[1];
         }
         
-        // Fallback: try to get from any link that looks like a username
-        let links = document.querySelectorAll('a[href*="/"]');
-        for (let link of links) {
-            let href = link.href;
-            let urlMatch = href.match(/letterboxd\.com\/([^\/\?]+)/);
-            if (urlMatch && urlMatch[1] && 
-                urlMatch[1].length > 2 && 
-                !['films', 'members', 'lists', 'request-password-reset', 'sign-in', 'sign-up', 'about', 'help', 'contact', 'popular', 'this', 'all-time'].includes(urlMatch[1])) {
-                console.log('Letterboxd Quick Rate: Found username from link:', urlMatch[1]);
-                return urlMatch[1];
-            }
-        }
-        
-        console.log('Letterboxd Quick Rate: Could not detect username');
+        console.log('Letterboxd Quick Rate: No username found');
         return null;
     }
 
@@ -253,13 +329,28 @@
         let modal = document.createElement('div');
         modal.id = 'lb-quickrate-modal';
         modal.innerHTML = `
-            <div id="lb-quickrate-close">&times;</div>
+            <div id="lb-quickrate-close" style="
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                font-size: 24px;
+                color: #999;
+                cursor: pointer;
+                z-index: 1000;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                transition: all 0.2s ease;
+            ">&times;</div>
             <div id="lb-quickrate-card">
                 <h2>${movie.title}</h2>
                 <img src="${movie.poster}" alt="${movie.title} poster" onerror="this.src='https://via.placeholder.com/250x375/333/666?text=No+Poster'"/>
                 <div id="lb-quickrate-stars">
                     ${[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(n => 
-                        `<button data-star="${n}" title="${n} star${n !== 1 ? 's' : ''}">${n % 1 === 0 ? '&#9733;' : '&#9734;'}</button>`
+                        `<button data-star="${n}" title="${n} star${n !== 1 ? 's' : ''}" style="pointer-events: auto;">${n % 1 === 0 ? '&#9733;' : '&#9734;'}</button>`
                     ).join('')}
                 </div>
                 <div id="lb-quickrate-buttons">
@@ -274,7 +365,9 @@
         // Add star hover effects with half-stars
         let stars = modal.querySelectorAll('button[data-star]');
         stars.forEach((star, index) => {
-            star.addEventListener('mouseenter', () => {
+            star.addEventListener('mouseenter', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 stars.forEach((s, i) => {
                     if (i <= index) {
                         s.classList.add('active');
@@ -284,30 +377,40 @@
                 });
             });
             
-            star.addEventListener('click', () => {
+            star.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 onRate(parseFloat(star.dataset.star));
                 modal.remove();
             });
         });
         
-        modal.querySelector('#lb-quickrate-stars').addEventListener('mouseleave', () => {
+        modal.querySelector('#lb-quickrate-stars').addEventListener('mouseleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             stars.forEach(s => s.classList.remove('active'));
         });
         
-        modal.querySelector('#lb-quickrate-skip').onclick = () => { 
+        modal.querySelector('#lb-quickrate-skip').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             onSkip(); 
             modal.remove(); 
-        };
+        });
         
-        modal.querySelector('#lb-quickrate-next').onclick = () => { 
+        modal.querySelector('#lb-quickrate-next').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             onSkip(); 
             modal.remove(); 
-        };
+        });
         
-        modal.querySelector('#lb-quickrate-close').onclick = () => { 
+        modal.querySelector('#lb-quickrate-close').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             onClose(); 
             modal.remove(); 
-        };
+        });
     }
 
     // --- FETCH MOVIES ---
@@ -315,86 +418,91 @@
         console.log('Letterboxd Quick Rate: Starting fetchMovies for username:', username);
         let movies = [];
 
-        // Simple function to extract movies from current page
-        function extractMoviesFromCurrentPage() {
-            console.log('Letterboxd Quick Rate: Extracting movies from current page...');
-            
-            // Look for all movie links on the page
-            let movieLinks = document.querySelectorAll('a[href*="/film/"]');
-            console.log('Letterboxd Quick Rate: Found', movieLinks.length, 'movie links');
-            
-            let extracted = [];
-            movieLinks.forEach(link => {
-                let href = link.getAttribute('href');
-                if (href && href.includes('/film/')) {
-                    // Extract slug from href
-                    let slug = href.replace('/film/', '').replace(/\/$/, '');
-                    
-                    // Get title from various sources
-                    let title = link.getAttribute('title') || 
-                               link.querySelector('img')?.alt ||
-                               link.textContent?.trim() ||
-                               'Unknown Title';
-                    
-                    // Get poster from img tag
-                    let poster = link.querySelector('img')?.src ||
-                                link.querySelector('img')?.getAttribute('data-src') ||
-                                'https://via.placeholder.com/250x375/333/666?text=No+Poster';
-                    
-                    // Only add if we have a valid slug and it's not already added
-                    if (slug && slug.length > 0 && !extracted.find(m => m.slug === slug)) {
-                        extracted.push({ title, slug, poster });
-                        console.log('Letterboxd Quick Rate: Found movie:', title, '(', slug, ')');
-                    }
-                }
-            });
-            
-            console.log('Letterboxd Quick Rate: Extracted', extracted.length, 'unique movies from current page');
-            return extracted;
-        }
-
-        // Extract from current page first (most reliable)
-        let currentMovies = extractMoviesFromCurrentPage();
-        movies = movies.concat(currentMovies);
-        
-        // If we didn't find enough movies, try to fetch popular ones
-        if (movies.length < 10) {
-            console.log('Letterboxd Quick Rate: Not enough movies found, fetching popular films...');
-            fetch('https://letterboxd.com/films/popular/this/all-time/')
-                .then(response => response.text())
+        // Function to extract movies from a specific URL
+        function fetchMoviesFromURL(url, source) {
+            return fetch(url)
+                .then(response => {
+                    console.log(`Letterboxd Quick Rate: ${source} response status:`, response.status);
+                    return response.text();
+                })
                 .then(html => {
                     let doc = new DOMParser().parseFromString(html, "text/html");
-                    let popularLinks = doc.querySelectorAll('a[href*="/film/"]');
+                    let extracted = [];
                     
-                    popularLinks.forEach(link => {
-                        let href = link.getAttribute('href');
-                        if (href && href.includes('/film/')) {
-                            let slug = href.replace('/film/', '').replace(/\/$/, '');
-                            let title = link.getAttribute('title') || 
-                                       link.querySelector('img')?.alt ||
-                                       link.textContent?.trim() ||
-                                       'Unknown Title';
-                            let poster = link.querySelector('img')?.src ||
-                                        link.querySelector('img')?.getAttribute('data-src') ||
-                                        'https://via.placeholder.com/250x375/333/666?text=No+Poster';
-                            
-                            if (slug && slug.length > 0 && !movies.find(m => m.slug === slug)) {
-                                movies.push({ title, slug, poster });
+                    // Look for movie posters in the DOM
+                    let posters = doc.querySelectorAll('.poster-list .film-poster, .poster-list li, .poster-list .poster');
+                    console.log(`Letterboxd Quick Rate: Found ${posters.length} posters in ${source}`);
+                    
+                    posters.forEach(poster => {
+                        // Get film slug from data attribute
+                        let slug = poster.getAttribute('data-film-slug');
+                        if (!slug) {
+                            // Try to get from child link
+                            let link = poster.querySelector('a[href*="/film/"]');
+                            if (link) {
+                                let href = link.getAttribute('href');
+                                slug = href.replace('/film/', '').replace(/\/$/, '');
                             }
+                        }
+                        
+                        // Get title from various sources
+                        let title = poster.getAttribute('data-film-name') || 
+                                   poster.querySelector('img')?.alt ||
+                                   poster.querySelector('.poster-title')?.textContent?.trim() ||
+                                   poster.querySelector('h3')?.textContent?.trim() ||
+                                   'Unknown Title';
+                        
+                        // Get poster image
+                        let posterImg = poster.querySelector('img')?.src ||
+                                       poster.querySelector('img')?.getAttribute('data-src') ||
+                                       'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                        
+                        if (slug && slug.length > 0 && title !== 'Unknown Title') {
+                            extracted.push({ title, slug, poster: posterImg });
+                            console.log(`Letterboxd Quick Rate: Found movie in ${source}:`, title, '(', slug, ')');
                         }
                     });
                     
-                    console.log('Letterboxd Quick Rate: Total movies found:', movies.length);
-                    callback(movies);
+                    return extracted;
                 })
                 .catch(error => {
-                    console.error('Failed to fetch popular films:', error);
-                    callback(movies);
+                    console.error(`Failed to fetch ${source}:`, error);
+                    return [];
                 });
-        } else {
-            console.log('Letterboxd Quick Rate: Total movies found:', movies.length);
-            callback(movies);
         }
+
+        // Fetch from user's films page
+        let userFilmsURL = `https://letterboxd.com/${username}/films/`;
+        console.log('Letterboxd Quick Rate: Fetching from:', userFilmsURL);
+        
+        fetchMoviesFromURL(userFilmsURL, 'user films')
+            .then(userMovies => {
+                movies = movies.concat(userMovies);
+                console.log('Letterboxd Quick Rate: User movies found:', userMovies.length);
+                
+                // If we didn't find enough movies, add popular ones
+                if (movies.length < 5) {
+                    console.log('Letterboxd Quick Rate: Not enough movies, fetching popular films...');
+                    return fetchMoviesFromURL('https://letterboxd.com/films/popular/this/all-time/', 'popular films');
+                } else {
+                    return [];
+                }
+            })
+            .then(popularMovies => {
+                // Add popular movies without duplicates
+                popularMovies.forEach(movie => {
+                    if (!movies.find(m => m.slug === movie.slug)) {
+                        movies.push(movie);
+                    }
+                });
+                
+                console.log('Letterboxd Quick Rate: Total movies found:', movies.length);
+                callback(movies);
+            })
+            .catch(error => {
+                console.error('Letterboxd Quick Rate: Error fetching movies:', error);
+                callback(movies);
+            });
     }
 
     // --- RATING FUNCTION ---
@@ -406,10 +514,20 @@
     // --- MAIN LOGIC ---
     function startQuickRate() {
         let username = getUsername();
+        
         if (!username) {
-            alert('Could not detect your username. Please make sure you are logged into Letterboxd.');
+            // Show username input modal
+            showUsernameInput((inputUsername) => {
+                startQuickRateWithUsername(inputUsername);
+            });
             return;
         }
+        
+        startQuickRateWithUsername(username);
+    }
+    
+    function startQuickRateWithUsername(username) {
+        console.log('Letterboxd Quick Rate: Starting with username:', username);
 
         // Show loading message
         let loadingModal = document.createElement('div');
@@ -417,7 +535,7 @@
         loadingModal.innerHTML = `
             <div id="lb-quickrate-card">
                 <h2>Loading Movies...</h2>
-                <p>Fetching your watched films and popular movies...</p>
+                <p>Fetching films for <strong>${username}</strong>...</p>
             </div>
         `;
         document.body.appendChild(loadingModal);
@@ -426,7 +544,7 @@
             loadingModal.remove();
             
             if (allMovies.length === 0) {
-                alert('No movies found. Please make sure you have some watched films or try again later.');
+                alert(`No movies found for user "${username}". Please check the username or try again.`);
                 return;
             }
 
