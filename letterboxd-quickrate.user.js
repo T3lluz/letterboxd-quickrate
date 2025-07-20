@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      2.1.0
+// @version      2.2.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -431,15 +431,43 @@
         fetchTopAllTimeMovies(callback);
     }
     
-    // Fetch from Letterboxd's Top All Time list
+    // Fetch from Letterboxd's popular lists
     function fetchTopAllTimeMovies(callback) {
-        console.log('Letterboxd Quick Rate: Fetching from Top All Time list...');
+        console.log('Letterboxd Quick Rate: Fetching from popular lists...');
         
-        fetch('https://letterboxd.com/films/popular/all-time/', {
+        // Try multiple popular lists in order of preference
+        const popularUrls = [
+            'https://letterboxd.com/films/popular/',
+            'https://letterboxd.com/films/popular/this-week/',
+            'https://letterboxd.com/films/popular/this-month/',
+            'https://letterboxd.com/films/popular/this-year/',
+            'https://letterboxd.com/films/popular/all-time/'
+        ];
+        
+        tryFetchFromUrls(popularUrls, 0, callback);
+    }
+    
+    // Recursively try URLs until one works
+    function tryFetchFromUrls(urls, index, callback) {
+        if (index >= urls.length) {
+            console.log('Letterboxd Quick Rate: All popular lists failed, falling back to current page...');
+            extractFromCurrentPage(callback);
+            return;
+        }
+        
+        const url = urls[index];
+        console.log(`Letterboxd Quick Rate: Trying ${url}...`);
+        
+        fetch(url, {
             method: 'GET',
             credentials: 'include'
         })
-        .then(response => response.text())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.text();
+        })
         .then(html => {
             // Create a temporary div to parse the HTML
             let parser = new DOMParser();
@@ -447,16 +475,18 @@
             
             let movies = [];
             
-            // Find all movie posters on the page
-            let moviePosters = doc.querySelectorAll('.poster-container, .film-poster');
-            console.log('Letterboxd Quick Rate: Found', moviePosters.length, 'movie posters on Top All Time page');
+            // Find all movie posters on the page - try multiple selectors
+            let moviePosters = doc.querySelectorAll('.poster-container, .film-poster, .poster, [data-target-link*="/film/"]');
+            console.log(`Letterboxd Quick Rate: Found ${moviePosters.length} movie posters on ${url}`);
             
             moviePosters.forEach((poster, index) => {
                 try {
                     // Find the movie link
-                    let link = poster.querySelector('a[href*="/film/"]') || poster.closest('a[href*="/film/"]');
+                    let link = poster.querySelector('a[href*="/film/"]') || 
+                               poster.closest('a[href*="/film/"]') ||
+                               poster;
                     
-                    if (link) {
+                    if (link && link.href && link.href.includes('/film/')) {
                         let href = link.href;
                         let slugMatch = href.match(/\/film\/([^\/\?]+)/);
                         
@@ -467,23 +497,28 @@
                             let title = link.getAttribute('data-original-title') ||
                                        link.getAttribute('title') ||
                                        link.querySelector('.frame-title')?.textContent?.trim() ||
-                                       link.querySelector('.film-title')?.textContent?.trim();
+                                       link.querySelector('.film-title')?.textContent?.trim() ||
+                                       link.querySelector('.poster-title')?.textContent?.trim();
                             
                             // If still no title, generate from slug
                             if (!title || title.includes('Watched by') || title.includes('members')) {
                                 title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
                             }
                             
-                            // Get poster image
-                            let img = poster.querySelector('img') || link.querySelector('img');
-                            let poster = img?.src ||
-                                       img?.getAttribute('data-src') ||
-                                       img?.getAttribute('data-srcset')?.split(' ')[0] ||
-                                       'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                            // Get poster image - try multiple approaches
+                            let img = poster.querySelector('img') || 
+                                     link.querySelector('img') ||
+                                     poster.querySelector('image');
+                            
+                            let posterUrl = img?.src ||
+                                           img?.getAttribute('data-src') ||
+                                           img?.getAttribute('data-srcset')?.split(' ')[0] ||
+                                           img?.getAttribute('xlink:href') ||
+                                           'https://via.placeholder.com/250x375/333/666?text=No+Poster';
                             
                             // Only add if we have a valid slug and title
                             if (slug && title && !movies.find(m => m.slug === slug)) {
-                                movies.push({ title, slug, poster });
+                                movies.push({ title, slug, poster: posterUrl });
                                 console.log(`Letterboxd Quick Rate: Added movie ${index + 1}: "${title}" (${slug})`);
                             }
                         }
@@ -493,22 +528,20 @@
                 }
             });
             
-            console.log('Letterboxd Quick Rate: Total movies extracted from Top All Time:', movies.length);
+            console.log(`Letterboxd Quick Rate: Total movies extracted from ${url}:`, movies.length);
             
-            // If we got movies from Top All Time, use them
+            // If we got movies, use them
             if (movies.length > 0) {
                 callback(movies);
             } else {
-                // Fallback to current page
-                console.log('Letterboxd Quick Rate: Falling back to current page extraction...');
-                extractFromCurrentPage(callback);
+                // Try next URL
+                tryFetchFromUrls(urls, index + 1, callback);
             }
         })
         .catch(error => {
-            console.error('Letterboxd Quick Rate: Error fetching Top All Time list:', error);
-            // Fallback to current page
-            console.log('Letterboxd Quick Rate: Falling back to current page extraction...');
-            extractFromCurrentPage(callback);
+            console.error(`Letterboxd Quick Rate: Error fetching ${url}:`, error);
+            // Try next URL
+            tryFetchFromUrls(urls, index + 1, callback);
         });
     }
     
