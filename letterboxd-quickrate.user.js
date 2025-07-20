@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.0.3
+// @version      1.0.4
 // @description  Quickly rate movies from your watched and popular films with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -270,65 +270,89 @@
 
     // --- FETCH MOVIES ---
     function fetchMovies(username, callback) {
+        console.log('Letterboxd Quick Rate: Starting fetchMovies for username:', username);
         let movies = [];
         let loaded = 0;
         let needed = 2;
 
-        // Watched films
+        // Helper function to extract movies from DOM
+        function extractMoviesFromDOM(doc, source) {
+            console.log('Letterboxd Quick Rate: Extracting movies from', source);
+            
+            // Try multiple selectors for different Letterboxd layouts
+            let selectors = [
+                '.poster-list .film-poster',
+                '.poster-list li',
+                '.poster-list .poster',
+                '.poster-list [data-film-slug]',
+                '.poster-list a[href*="/film/"]',
+                '.poster-list .poster-container',
+                '.poster-list .poster-view',
+                '.poster-list .poster-view .poster',
+                '.poster-list .poster-view .film-poster',
+                '.poster-list .poster-view li',
+                '.poster-list .poster-view a[href*="/film/"]',
+                // Add more general selectors
+                '.poster',
+                '.film-poster',
+                '[data-film-slug]',
+                'a[href*="/film/"]',
+                '.poster-container',
+                '.poster-view .poster',
+                '.poster-view .film-poster',
+                '.poster-view li',
+                '.poster-view a[href*="/film/"]'
+            ];
+            
+            let extracted = [];
+            for (let selector of selectors) {
+                let elements = doc.querySelectorAll(selector);
+                console.log('Letterboxd Quick Rate: Selector', selector, 'found', elements.length, 'elements');
+                if (elements.length > 0) {
+                    console.log('Letterboxd Quick Rate: Using selector:', selector);
+                    extracted = Array.from(elements).map(el => {
+                        // Try to get film slug from various attributes
+                        let slug = el.getAttribute('data-film-slug') || 
+                                  el.getAttribute('data-slug') ||
+                                  el.querySelector('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '') ||
+                                  el.closest('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '');
+                        
+                        // Try to get title from various sources
+                        let title = el.getAttribute('data-film-name') || 
+                                   el.getAttribute('data-title') ||
+                                   el.querySelector('img')?.alt ||
+                                   el.querySelector('.poster-title')?.textContent?.trim() ||
+                                   el.querySelector('h3')?.textContent?.trim() ||
+                                   'Unknown Title';
+                        
+                        // Try to get poster from various sources
+                        let poster = el.querySelector('img')?.src ||
+                                    el.querySelector('img')?.getAttribute('data-src') ||
+                                    'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                        
+                        return { title, slug, poster };
+                    }).filter(m => m.slug && m.slug.length > 0);
+                    break;
+                }
+            }
+            
+            console.log('Letterboxd Quick Rate: Extracted', extracted.length, 'movies from', source);
+            return extracted;
+        }
+
+        // Watched films - try fetch first, then fallback to current page
+        console.log('Letterboxd Quick Rate: Fetching watched films from:', `https://letterboxd.com/${username}/films/`);
         fetch(`https://letterboxd.com/${username}/films/`)
-            .then(response => response.text())
+            .then(response => {
+                console.log('Letterboxd Quick Rate: Watched films response status:', response.status);
+                return response.text();
+            })
             .then(html => {
                 console.log('Letterboxd Quick Rate: Raw HTML length for watched films:', html.length);
-                console.log('Letterboxd Quick Rate: HTML preview:', html.substring(0, 500));
+                console.log('Letterboxd Quick Rate: HTML preview:', html.substring(0, 1000));
                 try {
                     let doc = new DOMParser().parseFromString(html, "text/html");
-                    
-                    // Try multiple selectors for different Letterboxd layouts
-                    let selectors = [
-                        '.poster-list .film-poster',
-                        '.poster-list li',
-                        '.poster-list .poster',
-                        '.poster-list [data-film-slug]',
-                        '.poster-list a[href*="/film/"]',
-                        '.poster-list .poster-container',
-                        '.poster-list .poster-view',
-                        '.poster-list .poster-view .poster',
-                        '.poster-list .poster-view .film-poster',
-                        '.poster-list .poster-view li',
-                        '.poster-list .poster-view a[href*="/film/"]'
-                    ];
-                    
-                    let watched = [];
-                    for (let selector of selectors) {
-                        let elements = doc.querySelectorAll(selector);
-                        if (elements.length > 0) {
-                            console.log('Letterboxd Quick Rate: Found', elements.length, 'elements with selector:', selector);
-                            watched = Array.from(elements).map(el => {
-                                // Try to get film slug from various attributes
-                                let slug = el.getAttribute('data-film-slug') || 
-                                          el.getAttribute('data-slug') ||
-                                          el.querySelector('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '') ||
-                                          el.closest('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '');
-                                
-                                // Try to get title from various sources
-                                let title = el.getAttribute('data-film-name') || 
-                                           el.getAttribute('data-title') ||
-                                           el.querySelector('img')?.alt ||
-                                           el.querySelector('.poster-title')?.textContent?.trim() ||
-                                           el.querySelector('h3')?.textContent?.trim() ||
-                                           'Unknown Title';
-                                
-                                // Try to get poster from various sources
-                                let poster = el.querySelector('img')?.src ||
-                                            el.querySelector('img')?.getAttribute('data-src') ||
-                                            'https://via.placeholder.com/250x375/333/666?text=No+Poster';
-                                
-                                return { title, slug, poster };
-                            }).filter(m => m.slug && m.slug.length > 0);
-                            break;
-                        }
-                    }
-                    
+                    let watched = extractMoviesFromDOM(doc, 'fetched watched films');
                     movies = movies.concat(watched);
                     console.log('Letterboxd Quick Rate: Fetched', watched.length, 'watched films');
                 } catch (e) {
@@ -338,64 +362,31 @@
             })
             .catch(error => {
                 console.error('Failed to fetch watched films:', error);
+                console.log('Letterboxd Quick Rate: Trying to extract from current page DOM...');
+                
+                // Fallback: try to extract from current page if we're on the films page
+                if (window.location.pathname.includes('/films')) {
+                    let watched = extractMoviesFromDOM(document, 'current page DOM');
+                    movies = movies.concat(watched);
+                    console.log('Letterboxd Quick Rate: Extracted', watched.length, 'watched films from current page');
+                }
+                
                 if (++loaded === needed) callback(movies);
             });
 
         // Most popular all time
+        console.log('Letterboxd Quick Rate: Fetching popular films from:', 'https://letterboxd.com/films/popular/this/all-time/');
         fetch(`https://letterboxd.com/films/popular/this/all-time/`)
-            .then(response => response.text())
+            .then(response => {
+                console.log('Letterboxd Quick Rate: Popular films response status:', response.status);
+                return response.text();
+            })
             .then(html => {
                 console.log('Letterboxd Quick Rate: Raw HTML length for popular films:', html.length);
-                console.log('Letterboxd Quick Rate: HTML preview:', html.substring(0, 500));
+                console.log('Letterboxd Quick Rate: HTML preview:', html.substring(0, 1000));
                 try {
                     let doc = new DOMParser().parseFromString(html, "text/html");
-                    
-                    // Try multiple selectors for different Letterboxd layouts
-                    let selectors = [
-                        '.poster-list .film-poster',
-                        '.poster-list li',
-                        '.poster-list .poster',
-                        '.poster-list [data-film-slug]',
-                        '.poster-list a[href*="/film/"]',
-                        '.poster-list .poster-container',
-                        '.poster-list .poster-view',
-                        '.poster-list .poster-view .poster',
-                        '.poster-list .poster-view .film-poster',
-                        '.poster-list .poster-view li',
-                        '.poster-list .poster-view a[href*="/film/"]'
-                    ];
-                    
-                    let popular = [];
-                    for (let selector of selectors) {
-                        let elements = doc.querySelectorAll(selector);
-                        if (elements.length > 0) {
-                            console.log('Letterboxd Quick Rate: Found', elements.length, 'elements with selector:', selector);
-                            popular = Array.from(elements).map(el => {
-                                // Try to get film slug from various attributes
-                                let slug = el.getAttribute('data-film-slug') || 
-                                          el.getAttribute('data-slug') ||
-                                          el.querySelector('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '') ||
-                                          el.closest('a[href*="/film/"]')?.getAttribute('href')?.replace('/film/', '');
-                                
-                                // Try to get title from various sources
-                                let title = el.getAttribute('data-film-name') || 
-                                           el.getAttribute('data-title') ||
-                                           el.querySelector('img')?.alt ||
-                                           el.querySelector('.poster-title')?.textContent?.trim() ||
-                                           el.querySelector('h3')?.textContent?.trim() ||
-                                           'Unknown Title';
-                                
-                                // Try to get poster from various sources
-                                let poster = el.querySelector('img')?.src ||
-                                            el.querySelector('img')?.getAttribute('data-src') ||
-                                            'https://via.placeholder.com/250x375/333/666?text=No+Poster';
-                                
-                                return { title, slug, poster };
-                            }).filter(m => m.slug && m.slug.length > 0);
-                            break;
-                        }
-                    }
-                    
+                    let popular = extractMoviesFromDOM(doc, 'fetched popular films');
                     movies = movies.concat(popular);
                     console.log('Letterboxd Quick Rate: Fetched', popular.length, 'popular films');
                 } catch (e) {
