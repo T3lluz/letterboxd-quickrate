@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      1.7.0
+// @version      1.8.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -75,32 +75,45 @@
                 margin: 24px 0;
                 display: flex;
                 justify-content: center;
-                gap: 4px;
+                gap: 2px;
                 flex-wrap: wrap;
             }
             
-            #lb-quickrate-stars button {
-                font-size: 1.8em; 
-                margin: 0 2px; 
+            #lb-quickrate-stars .star {
+                font-size: 24px; 
+                margin: 0 1px; 
                 background: none; 
                 border: none; 
                 color: #333; 
                 cursor: pointer;
                 transition: all 0.2s ease;
-                filter: grayscale(1);
                 padding: 2px;
-                min-width: 24px;
+                min-width: 20px;
+                position: relative;
             }
             
-            #lb-quickrate-stars button:hover {
+            #lb-quickrate-stars .star:hover,
+            #lb-quickrate-stars .star.hover {
                 color: #ffcc00;
-                filter: grayscale(0);
                 transform: scale(1.1);
             }
             
-            #lb-quickrate-stars button.active {
+            #lb-quickrate-stars .star.active {
                 color: #ffcc00;
-                filter: grayscale(0);
+            }
+            
+            #lb-quickrate-stars .star.half {
+                color: #ffcc00;
+            }
+            
+            #lb-quickrate-stars .star.half::after {
+                content: '★';
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 50%;
+                overflow: hidden;
+                color: #ffcc00;
             }
             
             #lb-quickrate-buttons {
@@ -272,7 +285,7 @@
                 <img src="${movie.poster}" alt="${movie.title} poster" onerror="this.src='https://via.placeholder.com/250x375/333/666?text=No+Poster'"/>
                 <div id="lb-quickrate-stars">
                     ${[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(n => 
-                        `<button data-star="${n}" title="${n} star${n !== 1 ? 's' : ''}" style="pointer-events: auto;">${n % 1 === 0 ? '&#9733;' : '&#9734;'}</button>`
+                        `<button class="star" data-star="${n}" title="${n} star${n !== 1 ? 's' : ''}">★</button>`
                     ).join('')}
                 </div>
                 <div id="lb-quickrate-buttons">
@@ -284,17 +297,31 @@
         `;
         document.body.appendChild(modal);
 
-        // Add star hover effects with half-stars
-        let stars = modal.querySelectorAll('button[data-star]');
+        // Letterboxd-style star rating system
+        let stars = modal.querySelectorAll('.star');
+        let currentRating = 0;
+        
         stars.forEach((star, index) => {
+            let starValue = parseFloat(star.dataset.star);
+            
             star.addEventListener('mouseenter', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                
+                // Clear all stars
+                stars.forEach(s => {
+                    s.classList.remove('active', 'half', 'hover');
+                });
+                
+                // Fill stars up to current hover
                 stars.forEach((s, i) => {
-                    if (i <= index) {
-                        s.classList.add('active');
-                    } else {
-                        s.classList.remove('active');
+                    let sValue = parseFloat(s.dataset.star);
+                    if (sValue <= starValue) {
+                        if (sValue % 1 === 0) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.add('half');
+                        }
                     }
                 });
             });
@@ -302,7 +329,8 @@
             star.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                onRate(parseFloat(star.dataset.star));
+                currentRating = starValue;
+                onRate(currentRating);
                 modal.remove();
             });
         });
@@ -310,7 +338,25 @@
         modal.querySelector('#lb-quickrate-stars').addEventListener('mouseleave', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            stars.forEach(s => s.classList.remove('active'));
+            
+            // Clear hover effects
+            stars.forEach(s => {
+                s.classList.remove('active', 'half', 'hover');
+            });
+            
+            // Show current rating if any
+            if (currentRating > 0) {
+                stars.forEach(s => {
+                    let sValue = parseFloat(s.dataset.star);
+                    if (sValue <= currentRating) {
+                        if (sValue % 1 === 0) {
+                            s.classList.add('active');
+                        } else {
+                            s.classList.add('half');
+                        }
+                    }
+                });
+            }
         });
         
         modal.querySelector('#lb-quickrate-skip').addEventListener('click', (e) => {
@@ -376,8 +422,13 @@
                         title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
                     }
                     
-                    // Get poster image
-                    let poster = 'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                    // Get poster image - try multiple sources
+                    let poster = link.querySelector('img')?.src ||
+                                link.querySelector('img')?.getAttribute('data-src') ||
+                                link.querySelector('img')?.getAttribute('data-srcset')?.split(' ')[0] ||
+                                link.querySelector('.poster img')?.src ||
+                                link.querySelector('.poster img')?.getAttribute('data-src') ||
+                                'https://via.placeholder.com/250x375/333/666?text=No+Poster';
                     
                     // Only add if we have a valid slug and title
                     if (slug && title && !movies.find(m => m.slug === slug)) {
@@ -400,33 +451,36 @@
     function rateMovie(slug, stars) {
         console.log(`Letterboxd Quick Rate: Rating movie ${slug} with ${stars} stars`);
         
-        // Create the rating URL
-        let ratingURL = `https://letterboxd.com/film/${slug}/rate/${stars}/`;
+        // Use Letterboxd's actual rating endpoint
+        let ratingURL = `https://letterboxd.com/film/${slug}/rate/`;
+        
+        // Create form data like Letterboxd does
+        let formData = new FormData();
+        formData.append('rating', stars);
+        formData.append('_method', 'POST');
         
         // Use fetch to submit the rating
         fetch(ratingURL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
+            body: formData,
             credentials: 'include' // Include cookies for authentication
         })
         .then(response => {
             console.log(`Letterboxd Quick Rate: Rating response status: ${response.status}`);
-            if (response.ok) {
+            if (response.ok || response.status === 302) {
                 console.log(`Letterboxd Quick Rate: Successfully rated ${slug} with ${stars} stars`);
-                // Show success feedback
                 showRatingFeedback(true, stars);
             } else {
                 console.error(`Letterboxd Quick Rate: Failed to rate movie: ${response.status}`);
+                // Fallback: open rating page in new tab
+                window.open(`https://letterboxd.com/film/${slug}/`, '_blank');
                 showRatingFeedback(false, stars);
             }
         })
         .catch(error => {
             console.error('Letterboxd Quick Rate: Error rating movie:', error);
-            // Fallback: open in new tab
-            window.open(ratingURL, '_blank');
+            // Fallback: open movie page in new tab
+            window.open(`https://letterboxd.com/film/${slug}/`, '_blank');
             showRatingFeedback(false, stars);
         });
     }
