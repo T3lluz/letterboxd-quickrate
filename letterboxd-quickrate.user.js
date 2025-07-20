@@ -159,15 +159,30 @@
             text-decoration: none;
             display: inline-block;
             margin: 0 8px;
+            box-shadow: 0 4px 12px rgba(255, 128, 0, 0.3);
         }
         
         .lb-quickrate-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(255, 128, 0, 0.3);
+            box-shadow: 0 8px 20px rgba(255, 128, 0, 0.5);
         }
         
         .lb-quickrate-btn:active {
             transform: translateY(0);
+        }
+        
+        .lb-quickrate-floating {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            z-index: 99998;
+            animation: lb-quickrate-pulse 2s infinite;
+        }
+        
+        @keyframes lb-quickrate-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
     `);
 
@@ -384,29 +399,69 @@
     function addQuickRateButton() {
         // Wait for the page to load
         setTimeout(() => {
-            // Try to find the navigation
-            let nav = document.querySelector('nav');
-            if (!nav) {
-                // If no nav found, create a floating button
+            // Try multiple possible locations for the button
+            let buttonAdded = false;
+            
+            // 1. Try to add to the main navigation header
+            let header = document.querySelector('header');
+            if (header && !buttonAdded) {
+                let nav = header.querySelector('nav') || header.querySelector('.nav') || header.querySelector('.navigation');
+                if (nav) {
+                    let btn = document.createElement('a');
+                    btn.textContent = 'Quick Rate';
+                    btn.className = 'lb-quickrate-btn';
+                    btn.style = 'margin-left: 16px; display: inline-block;';
+                    btn.onclick = e => { 
+                        e.preventDefault(); 
+                        startQuickRate(); 
+                    };
+                    nav.appendChild(btn);
+                    buttonAdded = true;
+                }
+            }
+            
+            // 2. Try to add to the top navigation bar
+            let topNav = document.querySelector('.nav-primary') || document.querySelector('.primary-nav') || document.querySelector('.main-nav');
+            if (topNav && !buttonAdded) {
+                let btn = document.createElement('a');
+                btn.textContent = 'Quick Rate';
+                btn.className = 'lb-quickrate-btn';
+                btn.style = 'margin-left: 16px; display: inline-block;';
+                btn.onclick = e => { 
+                    e.preventDefault(); 
+                    startQuickRate(); 
+                };
+                topNav.appendChild(btn);
+                buttonAdded = true;
+            }
+            
+            // 3. Try to add to the user menu area
+            let userMenu = document.querySelector('.user-menu') || document.querySelector('.profile-menu') || document.querySelector('[data-testid="user-menu"]');
+            if (userMenu && !buttonAdded) {
+                let btn = document.createElement('a');
+                btn.textContent = 'Quick Rate';
+                btn.className = 'lb-quickrate-btn';
+                btn.style = 'margin-left: 16px; display: inline-block;';
+                btn.onclick = e => { 
+                    e.preventDefault(); 
+                    startQuickRate(); 
+                };
+                userMenu.appendChild(btn);
+                buttonAdded = true;
+            }
+            
+            // 4. If no suitable location found, create a floating button
+            if (!buttonAdded) {
                 let btn = document.createElement('div');
+                btn.className = 'lb-quickrate-floating';
                 btn.innerHTML = '<a class="lb-quickrate-btn">Quick Rate</a>';
-                btn.style = 'position:fixed;bottom:32px;right:32px;z-index:99998;';
                 btn.onclick = startQuickRate;
                 document.body.appendChild(btn);
-                return;
+                console.log('Letterboxd Quick Rate: Floating button added (no navigation found)');
+            } else {
+                console.log('Letterboxd Quick Rate: Button added to navigation');
             }
-
-            // Add button to navigation
-            let btn = document.createElement('a');
-            btn.textContent = 'Quick Rate';
-            btn.className = 'lb-quickrate-btn';
-            btn.style = 'margin-left: 16px;';
-            btn.onclick = e => { 
-                e.preventDefault(); 
-                startQuickRate(); 
-            };
-            nav.appendChild(btn);
-        }, 1000);
+        }, 2000); // Increased delay to ensure page is fully loaded
     }
 
     // --- INIT ---
