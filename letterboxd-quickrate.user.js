@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      2.0.0
+// @version      2.1.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -427,7 +427,93 @@
     function fetchMovies(callback) {
         console.log('Letterboxd Quick Rate: Starting movie extraction...');
         
-        // Simple, direct approach - extract from current page only
+        // Try to fetch from Letterboxd's Top All Time list first
+        fetchTopAllTimeMovies(callback);
+    }
+    
+    // Fetch from Letterboxd's Top All Time list
+    function fetchTopAllTimeMovies(callback) {
+        console.log('Letterboxd Quick Rate: Fetching from Top All Time list...');
+        
+        fetch('https://letterboxd.com/films/popular/all-time/', {
+            method: 'GET',
+            credentials: 'include'
+        })
+        .then(response => response.text())
+        .then(html => {
+            // Create a temporary div to parse the HTML
+            let parser = new DOMParser();
+            let doc = parser.parseFromString(html, 'text/html');
+            
+            let movies = [];
+            
+            // Find all movie posters on the page
+            let moviePosters = doc.querySelectorAll('.poster-container, .film-poster');
+            console.log('Letterboxd Quick Rate: Found', moviePosters.length, 'movie posters on Top All Time page');
+            
+            moviePosters.forEach((poster, index) => {
+                try {
+                    // Find the movie link
+                    let link = poster.querySelector('a[href*="/film/"]') || poster.closest('a[href*="/film/"]');
+                    
+                    if (link) {
+                        let href = link.href;
+                        let slugMatch = href.match(/\/film\/([^\/\?]+)/);
+                        
+                        if (slugMatch) {
+                            let slug = slugMatch[1];
+                            
+                            // Get title from multiple sources
+                            let title = link.getAttribute('data-original-title') ||
+                                       link.getAttribute('title') ||
+                                       link.querySelector('.frame-title')?.textContent?.trim() ||
+                                       link.querySelector('.film-title')?.textContent?.trim();
+                            
+                            // If still no title, generate from slug
+                            if (!title || title.includes('Watched by') || title.includes('members')) {
+                                title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                            }
+                            
+                            // Get poster image
+                            let img = poster.querySelector('img') || link.querySelector('img');
+                            let poster = img?.src ||
+                                       img?.getAttribute('data-src') ||
+                                       img?.getAttribute('data-srcset')?.split(' ')[0] ||
+                                       'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                            
+                            // Only add if we have a valid slug and title
+                            if (slug && title && !movies.find(m => m.slug === slug)) {
+                                movies.push({ title, slug, poster });
+                                console.log(`Letterboxd Quick Rate: Added movie ${index + 1}: "${title}" (${slug})`);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Letterboxd Quick Rate: Error processing movie poster:', error);
+                }
+            });
+            
+            console.log('Letterboxd Quick Rate: Total movies extracted from Top All Time:', movies.length);
+            
+            // If we got movies from Top All Time, use them
+            if (movies.length > 0) {
+                callback(movies);
+            } else {
+                // Fallback to current page
+                console.log('Letterboxd Quick Rate: Falling back to current page extraction...');
+                extractFromCurrentPage(callback);
+            }
+        })
+        .catch(error => {
+            console.error('Letterboxd Quick Rate: Error fetching Top All Time list:', error);
+            // Fallback to current page
+            console.log('Letterboxd Quick Rate: Falling back to current page extraction...');
+            extractFromCurrentPage(callback);
+        });
+    }
+    
+    // Fallback: extract from current page
+    function extractFromCurrentPage(callback) {
         let movies = [];
         
         // Find all movie links on the current page
@@ -443,34 +529,23 @@
                 if (slugMatch) {
                     let slug = slugMatch[1];
                     
-                    // Get title from data-original-title (most reliable)
-                    let title = link.getAttribute('data-original-title');
-                    
-                    // If no data-original-title, try frame-title
-                    if (!title) {
-                        let frameTitle = link.querySelector('.frame-title');
-                        if (frameTitle) {
-                            title = frameTitle.textContent.trim();
-                        }
-                    }
-                    
-                    // If still no title, try regular title attribute
-                    if (!title) {
-                        title = link.getAttribute('title');
-                    }
+                    // Get title from multiple sources
+                    let title = link.getAttribute('data-original-title') ||
+                               link.getAttribute('title') ||
+                               link.querySelector('.frame-title')?.textContent?.trim() ||
+                               link.querySelector('.film-title')?.textContent?.trim();
                     
                     // If still no title, generate from slug
-                    if (!title) {
+                    if (!title || title.includes('Watched by') || title.includes('members')) {
                         title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
                     }
                     
-                    // Get poster image - try multiple sources
-                    let poster = link.querySelector('img')?.src ||
-                                link.querySelector('img')?.getAttribute('data-src') ||
-                                link.querySelector('img')?.getAttribute('data-srcset')?.split(' ')[0] ||
-                                link.querySelector('.poster img')?.src ||
-                                link.querySelector('.poster img')?.getAttribute('data-src') ||
-                                'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                    // Get poster image
+                    let img = link.querySelector('img');
+                    let poster = img?.src ||
+                               img?.getAttribute('data-src') ||
+                               img?.getAttribute('data-srcset')?.split(' ')[0] ||
+                               'https://via.placeholder.com/250x375/333/666?text=No+Poster';
                     
                     // Only add if we have a valid slug and title
                     if (slug && title && !movies.find(m => m.slug === slug)) {
@@ -483,7 +558,7 @@
             }
         });
         
-        console.log('Letterboxd Quick Rate: Total movies extracted:', movies.length);
+        console.log('Letterboxd Quick Rate: Total movies extracted from current page:', movies.length);
         callback(movies);
     }
     
