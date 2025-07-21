@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      3.2.0
+// @version      3.3.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -73,37 +73,75 @@
             
             /* Letterboxd's exact star rating system */
             .rating-stars {
-                display: inline-block;
-                position: relative;
+                display: flex;
+                flex-direction: row-reverse;
+                justify-content: center;
+                margin: 24px 0;
                 font-size: 0;
                 line-height: 1;
-                margin: 24px 0;
             }
             
-            .rating-stars .star {
-                display: inline-block;
-                width: 24px;
-                height: 24px;
-                margin: 0 2px;
-                background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23666"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>') no-repeat center;
-                background-size: contain;
+            .rating-stars input {
+                position: absolute;
+                opacity: 0;
+                pointer-events: none;
+            }
+            
+            .rating-stars label {
                 cursor: pointer;
-                transition: all 0.2s ease;
+                font-size: 0;
+                color: rgba(255,255,255,0.2);
+                transition: color 0.1s ease-in-out;
+                margin: 0 2px;
                 position: relative;
             }
             
-            .rating-stars .star:hover,
-            .rating-stars .star.hover {
-                background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ffcc00"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>');
-                transform: scale(1.1);
+            .rating-stars label:before {
+                content: "★";
+                display: inline-block;
+                font-size: 32px;
+                font-family: 'Georgia', serif;
             }
             
-            .rating-stars .star.active {
-                background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ffcc00"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>');
+            .rating-stars input:checked ~ label {
+                color: #ffcc00;
             }
             
-            .rating-stars .star.half {
-                background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="half" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="50%" style="stop-color:%23ffcc00;stop-opacity:1" /><stop offset="50%" style="stop-color:%23666;stop-opacity:1" /></linearGradient></defs><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="url(%23half)"/></svg>');
+            .rating-stars label:hover,
+            .rating-stars label:hover ~ label {
+                color: #ffcc00;
+            }
+            
+            .rating-stars input:checked + label:hover,
+            .rating-stars input:checked + label:hover ~ label,
+            .rating-stars input:checked ~ label:hover,
+            .rating-stars input:checked ~ label:hover ~ label,
+            .rating-stars label:hover ~ input:checked ~ label {
+                color: #ffcc00;
+            }
+            
+            /* Half-star support */
+            .rating-stars .half-star {
+                position: relative;
+            }
+            
+            .rating-stars .half-star:before {
+                content: "★";
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 50%;
+                overflow: hidden;
+                color: #ffcc00;
+            }
+            
+            .rating-stars .half-star:after {
+                content: "☆";
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                color: rgba(255,255,255,0.2);
             }
             
             #lb-quickrate-buttons {
@@ -462,11 +500,18 @@
             <div id="lb-quickrate-card">
                 <h2>${movie.title}</h2>
                 <img src="${movie.poster}" alt="${movie.title} poster" onerror="this.src='https://via.placeholder.com/250x375/333/666?text=No+Poster'"/>
-                <div class="rating-stars">
-                    ${[0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map(n => 
-                        `<div class="star" data-star="${n}" title="${n} star${n !== 1 ? 's' : ''}"></div>`
-                    ).join('')}
-                </div>
+                <form class="rating-stars">
+                    <input type="radio" id="star5" name="rating" value="5" />
+                    <label for="star5" title="5 stars"></label>
+                    <input type="radio" id="star4" name="rating" value="4" />
+                    <label for="star4" title="4 stars"></label>
+                    <input type="radio" id="star3" name="rating" value="3" />
+                    <label for="star3" title="3 stars"></label>
+                    <input type="radio" id="star2" name="rating" value="2" />
+                    <label for="star2" title="2 stars"></label>
+                    <input type="radio" id="star1" name="rating" value="1" />
+                    <label for="star1" title="1 star"></label>
+                </form>
                 <div id="lb-quickrate-buttons">
                     <button id="lb-quickrate-skip">Skip</button>
                     <button id="lb-quickrate-rate">Rate</button>
@@ -476,75 +521,17 @@
         `;
         document.body.appendChild(modal);
 
-        // Letterboxd-style star rating system
-        let stars = modal.querySelectorAll('.star');
+        // Letterboxd-style star rating system with radio buttons
         let selectedRating = 0;
+        let ratingForm = modal.querySelector('.rating-stars');
+        let radioInputs = ratingForm.querySelectorAll('input[type="radio"]');
         
-        stars.forEach((star) => {
-            let starValue = parseFloat(star.dataset.star);
-            
-            star.addEventListener('mouseenter', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                stars.forEach(s => {
-                    s.classList.remove('active', 'half', 'hover');
-                });
-                
-                stars.forEach((s) => {
-                    let sValue = parseFloat(s.dataset.star);
-                    if (sValue <= starValue) {
-                        if (sValue % 1 === 0) {
-                            s.classList.add('active');
-                        } else {
-                            s.classList.add('half');
-                        }
-                    }
-                });
+        // Handle radio button changes
+        radioInputs.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                selectedRating = parseInt(e.target.value);
+                console.log(`Letterboxd Quick Rate: Selected rating: ${selectedRating}`);
             });
-            
-            star.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                selectedRating = starValue;
-                
-                stars.forEach(s => {
-                    s.classList.remove('active', 'half', 'hover');
-                });
-                
-                stars.forEach((s) => {
-                    let sValue = parseFloat(s.dataset.star);
-                    if (sValue <= selectedRating) {
-                        if (sValue % 1 === 0) {
-                            s.classList.add('active');
-                        } else {
-                            s.classList.add('half');
-                        }
-                    }
-                });
-            });
-        });
-        
-        modal.querySelector('.rating-stars').addEventListener('mouseleave', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            if (selectedRating > 0) {
-                stars.forEach(s => {
-                    s.classList.remove('active', 'half', 'hover');
-                });
-                
-                stars.forEach((s) => {
-                    let sValue = parseFloat(s.dataset.star);
-                    if (sValue <= selectedRating) {
-                        if (sValue % 1 === 0) {
-                            s.classList.add('active');
-                        } else {
-                            s.classList.add('half');
-                        }
-                    }
-                });
-            }
         });
         
         modal.querySelector('#lb-quickrate-rate').addEventListener('click', async (e) => {
@@ -668,7 +655,7 @@
     // --- INIT ---
     function init() {
         try {
-            console.log('Letterboxd Quick Rate: Version 3.2.0 - Initializing...');
+            console.log('Letterboxd Quick Rate: Version 3.3.0 - Initializing...');
             
             addStyles();
             console.log('Letterboxd Quick Rate: Styles added successfully');
