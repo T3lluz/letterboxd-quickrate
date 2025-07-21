@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      3.1.0
+// @version      3.2.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -71,7 +71,7 @@
                 box-shadow: 0 8px 24px rgba(0,0,0,0.4);
             }
             
-            /* Letterboxd's native star rating system */
+            /* Letterboxd's exact star rating system */
             .rating-stars {
                 display: inline-block;
                 position: relative;
@@ -349,83 +349,79 @@
         return constructedPoster;
     }
 
-    // --- DIRECT RATING SYSTEM ---
+    // --- IMPROVED RATING SYSTEM ---
     async function rateMovieDirectly(slug, stars) {
         console.log(`Letterboxd Quick Rate: Rating movie ${slug} with ${stars} stars directly`);
         
         try {
-            // Get CSRF token from current page
-            let csrfToken = getCSRFToken();
-            if (!csrfToken) {
-                console.log('Letterboxd Quick Rate: No CSRF token found, trying to fetch from movie page...');
-                csrfToken = await getCSRFTokenFromMoviePage(slug);
+            // First, try to get the movie page to extract the rating form and CSRF token
+            const moviePageResponse = await fetch(`https://letterboxd.com/film/${slug}/`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+            
+            if (!moviePageResponse.ok) {
+                throw new Error(`Failed to fetch movie page: ${moviePageResponse.status}`);
             }
             
-            if (!csrfToken) {
-                throw new Error('No CSRF token available');
+            const moviePageHtml = await moviePageResponse.text();
+            const parser = new DOMParser();
+            const movieDoc = parser.parseFromString(moviePageHtml, 'text/html');
+            
+            // Look for the rating form
+            const ratingForm = movieDoc.querySelector('form[action*="/rate/"]');
+            if (!ratingForm) {
+                throw new Error('No rating form found on movie page');
             }
             
-            // Submit rating using Letterboxd's API
-            const response = await fetch(`https://letterboxd.com/film/${slug}/rate/`, {
+            // Extract form action and CSRF token
+            const formAction = ratingForm.getAttribute('action');
+            const csrfToken = ratingForm.querySelector('input[name="csrfmiddlewaretoken"]')?.value ||
+                             movieDoc.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                             movieDoc.querySelector('meta[name="csrfmiddlewaretoken"]')?.getAttribute('content');
+            
+            if (!csrfToken) {
+                throw new Error('No CSRF token found on movie page');
+            }
+            
+            console.log(`Letterboxd Quick Rate: Found CSRF token and form action: ${formAction}`);
+            
+            // Submit the rating using the form action
+            const ratingResponse = await fetch(formAction, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'X-CSRFToken': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Referer': `https://letterboxd.com/film/${slug}/`,
+                    'Origin': 'https://letterboxd.com'
                 },
-                body: `rating=${stars}`,
+                body: `rating=${stars}&csrfmiddlewaretoken=${csrfToken}`,
                 credentials: 'include'
             });
             
-            console.log(`Letterboxd Quick Rate: Rating response status: ${response.status}`);
+            console.log(`Letterboxd Quick Rate: Rating response status: ${ratingResponse.status}`);
             
-            if (response.ok || response.status === 302) {
+            if (ratingResponse.ok || ratingResponse.status === 302 || ratingResponse.status === 200) {
                 console.log(`Letterboxd Quick Rate: Successfully rated ${slug} with ${stars} stars`);
                 showRatingFeedback(true, stars, slug);
                 return true;
             } else {
-                throw new Error(`HTTP ${response.status}`);
+                const responseText = await ratingResponse.text();
+                console.error(`Letterboxd Quick Rate: Rating failed with status ${ratingResponse.status}:`, responseText);
+                throw new Error(`HTTP ${ratingResponse.status}`);
             }
         } catch (error) {
             console.error('Letterboxd Quick Rate: Error rating movie directly:', error);
             showRatingFeedback(false, stars, slug);
             return false;
         }
-    }
-    
-    async function getCSRFTokenFromMoviePage(slug) {
-        try {
-            const response = await fetch(`https://letterboxd.com/film/${slug}/`, {
-                method: 'GET',
-                credentials: 'include'
-            });
-            
-            if (response.ok) {
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Look for CSRF token in meta tags or forms
-                let token = doc.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
-                           doc.querySelector('input[name="csrfmiddlewaretoken"]')?.value ||
-                           doc.querySelector('meta[name="csrfmiddlewaretoken"]')?.getAttribute('content');
-                
-                return token;
-            }
-        } catch (error) {
-            console.error('Letterboxd Quick Rate: Error fetching CSRF token from movie page:', error);
-        }
-        
-        return null;
-    }
-    
-    function getCSRFToken() {
-        // Try to get CSRF token from current page
-        let token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
-                   document.querySelector('input[name="csrfmiddlewaretoken"]')?.value ||
-                   document.querySelector('meta[name="csrfmiddlewaretoken"]')?.getAttribute('content');
-        
-        return token;
     }
     
     function showRatingFeedback(success, stars, slug) {
@@ -672,7 +668,7 @@
     // --- INIT ---
     function init() {
         try {
-            console.log('Letterboxd Quick Rate: Version 3.1.0 - Initializing...');
+            console.log('Letterboxd Quick Rate: Version 3.2.0 - Initializing...');
             
             addStyles();
             console.log('Letterboxd Quick Rate: Styles added successfully');
