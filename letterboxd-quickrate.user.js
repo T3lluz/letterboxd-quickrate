@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      2.2.0
+// @version      2.3.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -437,11 +437,13 @@
         
         // Try multiple popular lists in order of preference
         const popularUrls = [
+            'https://letterboxd.com/films/',
             'https://letterboxd.com/films/popular/',
-            'https://letterboxd.com/films/popular/this-week/',
-            'https://letterboxd.com/films/popular/this-month/',
-            'https://letterboxd.com/films/popular/this-year/',
-            'https://letterboxd.com/films/popular/all-time/'
+            'https://letterboxd.com/films/trending/',
+            'https://letterboxd.com/films/this-week/',
+            'https://letterboxd.com/films/this-month/',
+            'https://letterboxd.com/films/this-year/',
+            'https://letterboxd.com/films/all-time/'
         ];
         
         tryFetchFromUrls(popularUrls, 0, callback);
@@ -475,56 +477,83 @@
             
             let movies = [];
             
-            // Find all movie posters on the page - try multiple selectors
-            let moviePosters = doc.querySelectorAll('.poster-container, .film-poster, .poster, [data-target-link*="/film/"]');
-            console.log(`Letterboxd Quick Rate: Found ${moviePosters.length} movie posters on ${url}`);
+            // Find all movie links on the page - try multiple approaches
+            let movieLinks = doc.querySelectorAll('a[href*="/film/"]');
+            console.log(`Letterboxd Quick Rate: Found ${movieLinks.length} movie links on ${url}`);
             
-            moviePosters.forEach((poster, index) => {
+            movieLinks.forEach((link, index) => {
                 try {
-                    // Find the movie link
-                    let link = poster.querySelector('a[href*="/film/"]') || 
-                               poster.closest('a[href*="/film/"]') ||
-                               poster;
+                    let href = link.href;
+                    let slugMatch = href.match(/\/film\/([^\/\?]+)/);
                     
-                    if (link && link.href && link.href.includes('/film/')) {
-                        let href = link.href;
-                        let slugMatch = href.match(/\/film\/([^\/\?]+)/);
+                    if (slugMatch) {
+                        let slug = slugMatch[1];
                         
-                        if (slugMatch) {
-                            let slug = slugMatch[1];
-                            
-                            // Get title from multiple sources
-                            let title = link.getAttribute('data-original-title') ||
-                                       link.getAttribute('title') ||
-                                       link.querySelector('.frame-title')?.textContent?.trim() ||
-                                       link.querySelector('.film-title')?.textContent?.trim() ||
-                                       link.querySelector('.poster-title')?.textContent?.trim();
-                            
-                            // If still no title, generate from slug
-                            if (!title || title.includes('Watched by') || title.includes('members')) {
-                                title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                        // Get title from multiple sources
+                        let title = link.getAttribute('data-original-title') ||
+                                   link.getAttribute('title') ||
+                                   link.querySelector('.frame-title')?.textContent?.trim() ||
+                                   link.querySelector('.film-title')?.textContent?.trim() ||
+                                   link.querySelector('.poster-title')?.textContent?.trim() ||
+                                   link.querySelector('.poster-title')?.textContent?.trim();
+                        
+                        // If still no title, generate from slug
+                        if (!title || title.includes('Watched by') || title.includes('members')) {
+                            title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                        }
+                        
+                        // Get poster image - try EVERYTHING
+                        let posterUrl = null;
+                        
+                        // Method 1: Direct img in link
+                        let img = link.querySelector('img');
+                        if (img) {
+                            posterUrl = img.src || 
+                                       img.getAttribute('data-src') ||
+                                       img.getAttribute('data-srcset')?.split(' ')[0] ||
+                                       img.getAttribute('data-original');
+                        }
+                        
+                        // Method 2: Look in parent containers
+                        if (!posterUrl) {
+                            let container = link.closest('.poster-container, .film-poster, .poster, .poster-list-item');
+                            if (container) {
+                                let containerImg = container.querySelector('img');
+                                if (containerImg) {
+                                    posterUrl = containerImg.src || 
+                                               containerImg.getAttribute('data-src') ||
+                                               containerImg.getAttribute('data-srcset')?.split(' ')[0] ||
+                                               containerImg.getAttribute('data-original');
+                                }
                             }
-                            
-                            // Get poster image - try multiple approaches
-                            let img = poster.querySelector('img') || 
-                                     link.querySelector('img') ||
-                                     poster.querySelector('image');
-                            
-                            let posterUrl = img?.src ||
-                                           img?.getAttribute('data-src') ||
-                                           img?.getAttribute('data-srcset')?.split(' ')[0] ||
-                                           img?.getAttribute('xlink:href') ||
-                                           'https://via.placeholder.com/250x375/333/666?text=No+Poster';
-                            
-                            // Only add if we have a valid slug and title
-                            if (slug && title && !movies.find(m => m.slug === slug)) {
-                                movies.push({ title, slug, poster: posterUrl });
-                                console.log(`Letterboxd Quick Rate: Added movie ${index + 1}: "${title}" (${slug})`);
+                        }
+                        
+                        // Method 3: Look for any img with the slug in its src
+                        if (!posterUrl) {
+                            let allImgs = doc.querySelectorAll('img[src*="' + slug + '"]');
+                            if (allImgs.length > 0) {
+                                posterUrl = allImgs[0].src;
                             }
+                        }
+                        
+                        // Method 4: Try to construct poster URL from slug
+                        if (!posterUrl) {
+                            posterUrl = `https://a.ltrbxd.com/resized/film-poster/${slug}-0-600-0-900-crop.jpg`;
+                        }
+                        
+                        // Method 5: Fallback placeholder
+                        if (!posterUrl) {
+                            posterUrl = 'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                        }
+                        
+                        // Only add if we have a valid slug and title
+                        if (slug && title && !movies.find(m => m.slug === slug)) {
+                            movies.push({ title, slug, poster: posterUrl });
+                            console.log(`Letterboxd Quick Rate: Added movie ${index + 1}: "${title}" (${slug}) - Poster: ${posterUrl}`);
                         }
                     }
                 } catch (error) {
-                    console.error('Letterboxd Quick Rate: Error processing movie poster:', error);
+                    console.error('Letterboxd Quick Rate: Error processing movie link:', error);
                 }
             });
             
