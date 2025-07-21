@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Letterboxd Quick Rate (Tinder Style)
 // @namespace    https://github.com/T3lluz/letterboxd-quickrate
-// @version      2.3.0
+// @version      2.4.0
 // @description  Quickly rate popular movies with a swipe-like interface on Letterboxd
 // @author       T3lluz
 // @match        https://letterboxd.com/*
@@ -502,19 +502,30 @@
                             title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
                         }
                         
-                        // Get poster image - try EVERYTHING
+                        // Get poster image - try multiple methods including Open Graph meta tags
                         let posterUrl = null;
                         
-                        // Method 1: Direct img in link
-                        let img = link.querySelector('img');
-                        if (img) {
-                            posterUrl = img.src || 
-                                       img.getAttribute('data-src') ||
-                                       img.getAttribute('data-srcset')?.split(' ')[0] ||
-                                       img.getAttribute('data-original');
+                        // Method 1: Try to get from Open Graph meta tag (most reliable)
+                        if (!posterUrl) {
+                            let ogImage = doc.querySelector('meta[property="og:image"]');
+                            if (ogImage && ogImage.getAttribute('content')) {
+                                posterUrl = ogImage.getAttribute('content');
+                                console.log(`Letterboxd Quick Rate: Found poster from og:image: ${posterUrl}`);
+                            }
                         }
                         
-                        // Method 2: Look in parent containers
+                        // Method 2: Direct img in link
+                        if (!posterUrl) {
+                            let img = link.querySelector('img');
+                            if (img) {
+                                posterUrl = img.src || 
+                                           img.getAttribute('data-src') ||
+                                           img.getAttribute('data-srcset')?.split(' ')[0] ||
+                                           img.getAttribute('data-original');
+                            }
+                        }
+                        
+                        // Method 3: Look in parent containers
                         if (!posterUrl) {
                             let container = link.closest('.poster-container, .film-poster, .poster, .poster-list-item');
                             if (container) {
@@ -528,7 +539,7 @@
                             }
                         }
                         
-                        // Method 3: Look for any img with the slug in its src
+                        // Method 4: Look for any img with the slug in its src
                         if (!posterUrl) {
                             let allImgs = doc.querySelectorAll('img[src*="' + slug + '"]');
                             if (allImgs.length > 0) {
@@ -536,12 +547,12 @@
                             }
                         }
                         
-                        // Method 4: Try to construct poster URL from slug
+                        // Method 5: Try to construct poster URL from slug using Letterboxd's CDN pattern
                         if (!posterUrl) {
                             posterUrl = `https://a.ltrbxd.com/resized/film-poster/${slug}-0-600-0-900-crop.jpg`;
                         }
                         
-                        // Method 5: Fallback placeholder
+                        // Method 6: Fallback placeholder
                         if (!posterUrl) {
                             posterUrl = 'https://via.placeholder.com/250x375/333/666?text=No+Poster';
                         }
@@ -602,12 +613,33 @@
                         title = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
                     }
                     
-                    // Get poster image
-                    let img = link.querySelector('img');
-                    let poster = img?.src ||
-                               img?.getAttribute('data-src') ||
-                               img?.getAttribute('data-srcset')?.split(' ')[0] ||
-                               'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                    // Get poster image - try multiple methods including Open Graph meta tags
+                    let poster = null;
+                    
+                    // Method 1: Try to get from Open Graph meta tag (most reliable)
+                    if (!poster) {
+                        let ogImage = document.querySelector('meta[property="og:image"]');
+                        if (ogImage && ogImage.getAttribute('content')) {
+                            poster = ogImage.getAttribute('content');
+                            console.log(`Letterboxd Quick Rate: Found poster from og:image: ${poster}`);
+                        }
+                    }
+                    
+                    // Method 2: Direct img in link
+                    if (!poster) {
+                        let img = link.querySelector('img');
+                        if (img) {
+                            poster = img.src || 
+                                    img.getAttribute('data-src') ||
+                                    img.getAttribute('data-srcset')?.split(' ')[0] ||
+                                    img.getAttribute('data-original');
+                        }
+                    }
+                    
+                    // Method 3: Fallback placeholder
+                    if (!poster) {
+                        poster = 'https://via.placeholder.com/250x375/333/666?text=No+Poster';
+                    }
                     
                     // Only add if we have a valid slug and title
                     if (slug && title && !movies.find(m => m.slug === slug)) {
